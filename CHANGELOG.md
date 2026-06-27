@@ -8,6 +8,19 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.5.1] — 2026-06-28
+
+### Added
+- **Prompt enhancer (optional, fully on-device)**: a Settings toggle enables a local LLM
+  (`Qwen3-4B-Instruct-2507`, via mlx-lm) that rewrites the prompt — translating non-English
+  prompts (e.g. Korean) into English and enriching them into vivid image captions. Click the
+  **Enhance** button to rewrite the prompt in place; you review/edit the English before
+  generating, so seeds stay reproducible. Deterministic (greedy + cached). Adds
+  `GET /api/system` and `POST /api/enhance`.
+- **Memory-aware gating**: on Macs with ≤ 24 GB the toggle defaults off and asks for
+  confirmation before enabling (the ~2.3 GB enhancer model competes with the image model for
+  unified memory). The self-contained `.dmg` bundles mlx-lm; the model downloads on first use.
+
 ## [0.5.0] — 2026-06-27
 
 ### Added
@@ -56,6 +69,7 @@ web UI, and the DMG build stamps it into the app bundle.
 - Initial release: a local, model-agnostic, standard-library image-generation studio for
   Apple silicon (MLX), with the pure-MLX Krea 2 Turbo backend.
 
+[0.5.1]: https://github.com/avlp12/alis-studio/releases/tag/v0.5.1
 [0.5.0]: https://github.com/avlp12/alis-studio/releases/tag/v0.5.0
 [0.4.0]: https://github.com/avlp12/alis-studio/releases/tag/v0.4.0
 [0.3.0]: https://github.com/avlp12/alis-studio/releases/tag/v0.3.0
