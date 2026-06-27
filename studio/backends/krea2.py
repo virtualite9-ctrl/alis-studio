@@ -14,6 +14,7 @@ from .base import Backend
 class Krea2Backend(Backend):
     id = "krea2-turbo"
     label = "Krea 2 Turbo"
+    prompt_note = "Understands Korean and other languages natively (Qwen3 text encoder)."
     variants = [
         {"id": "8bit", "label": "8-bit · best quality"},
         {"id": "mixed-4-8", "label": "mixed-4/8 · smaller"},

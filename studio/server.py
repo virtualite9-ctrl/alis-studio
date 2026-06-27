@@ -16,6 +16,7 @@ import time
 import webbrowser
 from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 
+from . import __version__
 from .registry import Registry
 
 HERE = os.path.dirname(os.path.abspath(__file__))
@@ -27,6 +28,11 @@ PORT = int(os.environ.get("ALIS_PORT") or os.environ.get("PORT") or "7860")
 _REGISTRY: Registry | None = None
 _LOCK = threading.Lock()    # one GPU — serialize generation
 _DLLOCK = threading.Lock()  # serialize downloads (shared .part files)
+_CANCEL = threading.Event()  # set by POST /api/cancel — the in-flight generation stops at its next step
+
+
+class _Cancelled(Exception):
+    """Raised from the step callback when the user clicks Stop."""
 
 
 def _registry() -> Registry:
@@ -98,9 +104,12 @@ class Handler(BaseHTTPRequestHandler):
         if path in ("/", "/index.html"):
             try:
                 with open(os.path.join(WEB, "index.html"), "rb") as f:
-                    self._send(200, "text/html; charset=utf-8", f.read())
+                    html = f.read().replace(b"__ALIS_VERSION__", __version__.encode())
+                self._send(200, "text/html; charset=utf-8", html)
             except OSError:
                 self._send(500, "text/plain", b"web/index.html is missing")
+        elif path == "/api/version":
+            self._send(200, "application/json", json.dumps({"version": __version__}).encode())
         elif path == "/api/models":
             self._send(200, "application/json", json.dumps({"backends": _registry().models()}).encode())
         elif path == "/api/catalog":
@@ -122,6 +131,10 @@ class Handler(BaseHTTPRequestHandler):
         return emit
 
     def do_POST(self):
+        if self.path == "/api/cancel":           # no body — just flag the running generation to stop
+            _CANCEL.set()
+            self._send(200, "application/json", b'{"ok":true}')
+            return
         if self.path not in ("/api/generate", "/api/download", "/api/delete"):
             self._send(404, "text/plain", b"not found")
             return
@@ -140,7 +153,21 @@ class Handler(BaseHTTPRequestHandler):
 
     def _generate(self, req):
         emit = self._stream()
+
+        def safe_emit(obj):           # the client may have gone away (Stop / closed tab)
+            try:
+                emit(obj)
+            except OSError:
+                pass
+
         with _LOCK:
+            _CANCEL.clear()           # fresh generation — forget any earlier Stop request
+
+            def step(s, total):       # called once per denoise step; the Stop hook lives here
+                if _CANCEL.is_set():
+                    raise _Cancelled()
+                emit({"type": "step", "step": s, "total": total})
+
             try:
                 backend, variant = _registry().resolve(req.get("model", ""))
                 params = dict(req.get("params") or {})
@@ -150,23 +177,32 @@ class Handler(BaseHTTPRequestHandler):
                 t0 = time.time()
                 imgs = backend.generate(
                     prompt=str(req.get("prompt", "")), variant=variant, params=params,
-                    step_callback=lambda s, total: emit({"type": "step", "step": s, "total": total}),
+                    step_callback=step,
                 )
+                if _CANCEL.is_set():  # stopped after the last step, or by a backend that doesn't tick
+                    raise _Cancelled()
                 imgs, flagged = _apply_safety(imgs, req.get("safety", True))
                 emit({"type": "done", "flagged": flagged,
                       "images": [_png_datauri(im) for im in imgs],
                       "meta": {"model": backend.label, "width": w, "height": h,
                                "steps": int(params.get("steps", 8)), "seed": int(params.get("seed", 0)),
                                "seconds": round(time.time() - t0, 1)}})
+            except _Cancelled:
+                safe_emit({"type": "cancelled"})
+            except (BrokenPipeError, ConnectionResetError):
+                return                # client disconnected mid-stream — nothing left to send
             except ValueError as e:
-                emit({"type": "error", "message": str(e)})
+                safe_emit({"type": "error", "message": str(e)})
             except Exception as e:
+                if _CANCEL.is_set():  # a backend that wrapped the _Cancelled into its own error
+                    safe_emit({"type": "cancelled"})
+                    return
                 m = str(e).lower()
                 if any(k in m for k in ("memory", "alloc", "metal")):
-                    emit({"type": "error", "message": "Out of memory — try a smaller size, fewer "
-                          "images, or a lighter model build."})
+                    safe_emit({"type": "error", "message": "Out of memory — try a smaller size, fewer "
+                               "images, or a lighter model build."})
                 else:
-                    emit({"type": "error", "message": f"Generation failed: {e}"})
+                    safe_emit({"type": "error", "message": f"Generation failed: {e}"})
 
     def _download(self, req):
         emit = self._stream()

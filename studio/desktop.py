@@ -9,6 +9,7 @@ from __future__ import annotations
 
 import os
 
+from . import __version__
 from .server import start_http
 
 
@@ -19,7 +20,7 @@ def main():
     port = int(os.environ.get("ALIS_PORT") or 0)
     server, port = start_http("127.0.0.1", port)
     webview.create_window(
-        "Alis Studio", f"http://127.0.0.1:{port}/",
+        f"Alis Studio {__version__}", f"http://127.0.0.1:{port}/",
         width=1120, height=860, min_size=(840, 600),
     )
     try:

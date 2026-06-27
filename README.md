@@ -44,6 +44,25 @@ python3 desktop.py
 Same UI and server; the window just hosts it natively. (`alis-studio-desktop` is also installed
 as a console script when you `pip install`.)
 
+### Standalone app — build a self-contained `.dmg`
+
+Want something you can just double-click, with no Python or `pip` to set up? Build a self-contained
+app that bundles its own Python interpreter **and every dependency** inside the `.app`:
+
+```bash
+python3 -m pip install pillow   # optional — for the app icon
+bash packaging/build_dmg.sh     # needs `uv`  →  https://docs.astral.sh/uv/
+```
+
+This produces `dist/Alis Studio.app` and `dist/Alis-Studio-<version>.dmg` (~400 MB). Open the DMG
+and drag **Alis Studio** to Applications, then launch it like any other app — nothing else to
+install. As always, the first image downloads the model weights from Hugging Face; those are far
+too large to ship inside a DMG.
+
+> The app is **ad-hoc signed**, which is all you need to run it on the Mac that built it. To hand the
+> DMG to other machines you'd sign it with a Developer ID and notarize it — otherwise Gatekeeper
+> blocks a downloaded, un-notarized app.
+
 - **Detailed settings** — a model-adaptive panel on the right: resolution with aspect-ratio
   presets, steps, batch size, seed (with randomize), guidance, sampler, negative prompt. Each
   model exposes exactly the controls it supports; the panel renders itself from the backend.
