@@ -201,16 +201,25 @@ class Handler(BaseHTTPRequestHandler):
             self._send(500, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
 
 
+def start_http(host=HOST, port=PORT):
+    """Build the registry and run the HTTP server in a background daemon thread.
+    Returns (server, bound_port). Pass port=0 to bind a free port (the native window does this)."""
+    _registry()  # build up front so /api/models is ready and startup fails loudly
+    server = ThreadingHTTPServer((host, port), Handler)
+    threading.Thread(target=server.serve_forever, daemon=True).start()
+    return server, server.server_address[1]
+
+
 def serve():
-    _registry()  # build the registry up front so /api/models is ready and startup fails loudly
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
-    url = f"http://{'localhost' if HOST in ('127.0.0.1', '0.0.0.0') else HOST}:{PORT}"
+    server, port = start_http(HOST, PORT)
+    url = f"http://{'localhost' if HOST in ('127.0.0.1', '0.0.0.0') else HOST}:{port}"
     print(f"Alis Studio  →  {url}")
     print("First run downloads the model (a few minutes). Press Ctrl+C to stop.")
     if HOST in ("127.0.0.1", "0.0.0.0"):
         threading.Timer(0.6, lambda: webbrowser.open(url)).start()
     try:
-        server.serve_forever()
+        while True:
+            time.sleep(3600)
     except KeyboardInterrupt:
         print("\nstopped.")
         server.shutdown()

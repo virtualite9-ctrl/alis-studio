@@ -31,11 +31,24 @@ Type a prompt, pick a model, click **Generate**. The first run downloads the mod
 Hugging Face (a few minutes); after that it's instant to start. A 1024² image takes ~50 s on an
 M3 Ultra (8-step Turbo; slower chips take longer).
 
+### Run as a native app
+
+Prefer a real window to a browser tab? Run it as a **native macOS app** — its own title bar, dock
+icon, and menu, drawn with the system **WKWebView** (no browser or Chromium bundle):
+
+```bash
+python3 -m pip install pywebview
+python3 desktop.py
+```
+
+Same UI and server; the window just hosts it natively. (`alis-studio-desktop` is also installed
+as a console script when you `pip install`.)
+
 - **Detailed settings** — a model-adaptive panel on the right: resolution with aspect-ratio
   presets, steps, batch size, seed (with randomize), guidance, sampler, negative prompt. Each
   model exposes exactly the controls it supports; the panel renders itself from the backend.
-- **Model manager** — the **Models** button (top-right) opens a manager to browse, **download**
-  (with a live progress bar), and delete model weights, and see total disk usage.
+- **Model picker** — the **Model** control in Settings opens a popover grouping every model and
+  build; switch with a click, **download** (live progress) or delete weights inline, see disk usage.
 - **Live progress** — a per-step bar as the model denoises. **Light + dark** follow your system.
 - **NSFW safety filter** runs by default (pure-MLX, no PyTorch); toggle it with the shield icon.
 - Bind to your LAN with `ALIS_HOST=0.0.0.0 python3 app.py` (only on networks you trust); change

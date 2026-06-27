@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "alis-studio"
-version = "0.3.0"
+version = "0.4.0"
 description = "A local, model-agnostic image-generation studio for Apple silicon (MLX)."
 readme = "README.md"
 requires-python = ">=3.10"
@@ -23,8 +23,12 @@ dependencies = [
     "krea2-alis-mlx @ git+https://github.com/avlp12/krea2_alis_mlx.git",
 ]
 
+[project.optional-dependencies]
+desktop = ["pywebview>=5,<7"]   # native window (WKWebView on macOS); pulls the pyobjc backend
+
 [project.scripts]
 alis-studio = "studio.server:serve"
+alis-studio-desktop = "studio.desktop:main"
 
 [project.urls]
 Homepage = "https://github.com/avlp12/alis-studio"
