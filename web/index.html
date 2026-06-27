@@ -63,8 +63,13 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
 textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-height:1.4}
 .disabled{opacity:.5;pointer-events:none}
-.mhdr{font-size:12px;font-weight:500;color:var(--text);margin:13px 0 7px}
-#modelGroup .mhdr:first-of-type{margin-top:3px}
+.mhdr{display:flex;align-items:center;gap:6px;font-size:12px;font-weight:500;color:var(--text);margin:11px 0 7px;cursor:pointer;user-select:none}
+.mhdr:hover{color:var(--clay)}
+.mhdr .chev{display:inline-flex;color:var(--muted);transition:transform .15s}
+.mhdr .chev svg{width:14px;height:14px}
+.mhdr .chev.open{transform:rotate(90deg)}
+.mhdr .hact{color:var(--clay);font-weight:400;font-size:11px;margin-left:1px}
+#modelGroup .mhdr:first-of-type{margin-top:4px}
 .mrow{display:flex;align-items:center;gap:10px;padding:9px 10px;border:0.5px solid var(--border);border-radius:10px;background:var(--surface-2);margin-bottom:7px;flex-wrap:wrap}
 .mrow.active{border-color:var(--clay)}
 .mic{width:30px;height:30px;border-radius:7px;background:var(--surface-1);display:flex;align-items:center;justify-content:center;color:var(--text-2);flex:none}.mic svg{width:16px;height:16px}
@@ -148,6 +153,7 @@ async function loadAll(){
   }catch(e){showErr("Couldn’t reach the server: "+e.message);}
 }
 let DOWNLOADING=false;
+const EXPANDED=new Set();   // which model groups are expanded in the Model section
 // the authoritative build list is /api/models variants, enriched with /api/catalog (size + install
 // state). a variant with no catalog entry is a local/non-downloadable model: always usable, no buttons.
 function allBuilds(){
@@ -163,6 +169,7 @@ const buildOf=model=>allBuilds().find(b=>b.backend+":"+b.variant===model);
 function setActive(model,initial){
   const changedBackend=backendOf(model)!==backendOf(current);
   current=model;
+  EXPANDED.add(model.split(":")[0]);   // keep the active model's group open
   const b=backendOf(model),bld=buildOf(model);
   activeName.textContent=b.label+" · "+(bld?bld.label.split(" · ")[0]:model.split(":")[1]);
   if(initial||changedBackend)renderParams(b);
@@ -181,10 +188,14 @@ function renderModelGroup(){
   modelGroup.innerHTML="";
   const head=el("div","sgrp","Model");head.appendChild(el("span","disk",(CATALOG.disk_gb||0)+" GB"));modelGroup.appendChild(head);
   const builds=allBuilds(),byB={};
-  builds.forEach(b=>(byB[b.backend]=byB[b.backend]||[]).push(b));   // group rows under each model name
-  Object.values(byB).forEach(grp=>{
-    modelGroup.appendChild(el("div","mhdr",grp[0].blabel));
-    grp.forEach(b=>modelGroup.appendChild(modelRow(b)));
+  builds.forEach(b=>(byB[b.backend]=byB[b.backend]||[]).push(b));   // one collapsible group per model
+  Object.entries(byB).forEach(([bid,grp])=>{
+    const open=EXPANDED.has(bid),active=grp.some(b=>b.backend+":"+b.variant===current);
+    const chev='<span class="chev'+(open?" open":"")+'"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round"><path d="M9 6l6 6-6 6"/></svg></span>';
+    const hdr=el("div","mhdr",chev+grp[0].blabel+((active&&!open)?' <span class="hact">· active</span>':''));
+    hdr.onclick=()=>{open?EXPANDED.delete(bid):EXPANDED.add(bid);renderModelGroup();};
+    modelGroup.appendChild(hdr);
+    if(open)grp.forEach(b=>modelGroup.appendChild(modelRow(b)));
   });
 }
 
