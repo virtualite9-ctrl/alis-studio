@@ -50,28 +50,10 @@ BPY="$RES/python/bin/python3"
 find "$RES/python/lib" -name 'EXTERNALLY-MANAGED' -delete 2>/dev/null || true
 
 # --- 2) install runtime deps INTO the bundled interpreter -----------------------------------
-# krea2-alis-mlx==0.1.0 publishes stale upper-bound pins (pillow<12, huggingface-hub<1, …) that
-# contradict the mflux>=0.18 it also requires — it's path-imported in dev, so those pins were
-# never enforced. We pin the conflict-prone packages to the exact versions proven-good in the
-# build machine's reference Python (the set the port was validated against), forcing a coherent,
-# faithful install. (The real fix is to correct krea2_alis_mlx's pins upstream.)
 echo "  • installing runtime deps into the bundle (mlx, mflux, transformers, pywebview, Krea 2 Turbo backend)…"
-REF_PY="$(command -v python3)"
-OVERRIDES="$(mktemp)"
-"$REF_PY" - > "$OVERRIDES" <<'PYREF'
-import importlib.metadata as m
-for p in ["mflux", "huggingface-hub", "pillow", "transformers", "tokenizers",
-          "safetensors", "mlx", "numpy", "sentencepiece"]:
-    try:
-        print(f"{p}=={m.version(p)}")
-    except Exception:
-        pass
-PYREF
-echo "    (pinning the validated set: $(tr '\n' ' ' < "$OVERRIDES"))"
-uv pip install --python "$BPY" --override "$OVERRIDES" \
+uv pip install --python "$BPY" \
   "krea2-alis-mlx @ git+https://github.com/avlp12/krea2_alis_mlx.git" \
   "pywebview>=5,<7"
-rm -f "$OVERRIDES"
 
 # --- 3) the app code (pure-python studio/ + web/), beside the bundled interpreter ------------
 cp -R "$ROOT/studio" "$RES/app/studio"
