@@ -14,7 +14,7 @@ import os
 import threading
 import time
 import webbrowser
-from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
+from http.server import BaseHTTPRequestHandler, HTTPServer
 
 from .registry import Registry
 
@@ -203,7 +203,11 @@ class Handler(BaseHTTPRequestHandler):
 
 def serve():
     _registry()  # build the registry up front so /api/models is ready and startup fails loudly
-    server = ThreadingHTTPServer((HOST, PORT), Handler)
+    # MLX model objects are stream/thread-local. A per-request ThreadingHTTPServer
+    # can load a pipeline in one request thread and reuse it in another, which
+    # raises `There is no Stream(gpu, 0) in current thread` at generation time.
+    # Use a single request thread; generation is serialized anyway by _LOCK.
+    server = HTTPServer((HOST, PORT), Handler)
     url = f"http://{'localhost' if HOST in ('127.0.0.1', '0.0.0.0') else HOST}:{PORT}"
     print(f"Alis Studio  →  {url}")
     print("First run downloads the model (a few minutes). Press Ctrl+C to stop.")
