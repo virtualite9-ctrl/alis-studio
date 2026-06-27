@@ -139,76 +139,95 @@ async function loadAll(){
     const[m,c]=await Promise.all([fetch("/api/models").then(r=>r.json()),fetch("/api/catalog").then(r=>r.json())]);
     BACKENDS=m.backends||[]; CATALOG=c||{backends:[],disk_gb:0};
     if(!BACKENDS.length){showErr("No models available. Install a backend and restart.");return;}
-    const all=allEntries(); const first=all.find(e=>e.installed)||all[0];
+    const builds=allBuilds(); const first=builds.find(b=>b.installed)||builds[0];
     if(!first){showErr("No model builds found.");return;}
     setActive(first.backend+":"+first.variant,true);
-    gen.disabled=false;
+    reconcile();
   }catch(e){showErr("Couldn’t reach the server: "+e.message);}
 }
-function allEntries(){const out=[];(CATALOG.backends||[]).forEach(b=>b.entries.forEach(e=>out.push(e)));return out;}
+let DOWNLOADING=false;
+// the authoritative build list is /api/models variants, enriched with /api/catalog (size + install
+// state). a variant with no catalog entry is a local/non-downloadable model: always usable, no buttons.
+function allBuilds(){
+  const cat={};(CATALOG.backends||[]).forEach(b=>b.entries.forEach(e=>cat[b.id+":"+e.variant]=e));
+  const out=[];
+  BACKENDS.forEach(b=>b.variants.forEach(v=>{const c=cat[b.id+":"+v.id];
+    out.push({backend:b.id,blabel:b.label,variant:v.id,label:v.label,
+      installed:c?!!c.installed:true,downloadable:!!c,size_gb:c?c.size_gb:null,note:c?c.note:null});}));
+  return out;
+}
+const buildOf=model=>allBuilds().find(b=>b.backend+":"+b.variant===model);
 
 function setActive(model,initial){
   const changedBackend=backendOf(model)!==backendOf(current);
   current=model;
-  const b=backendOf(model),v=model.split(":")[1];
-  const cat=allEntries().find(e=>e.backend===b.id&&e.variant===v);
-  activeName.textContent=b.label+" · "+(cat?cat.label.split(" · ")[0]:v);
+  const b=backendOf(model),bld=buildOf(model);
+  activeName.textContent=b.label+" · "+(bld?bld.label.split(" · ")[0]:model.split(":")[1]);
   if(initial||changedBackend)renderParams(b);
   renderModelGroup();
 }
 
-function renderModelGroup(){
-  modelGroup.innerHTML="";
-  const head=el("div","sgrp","Model");
-  head.appendChild(el("span","disk",(CATALOG.disk_gb||0)+" GB"));
-  modelGroup.appendChild(head);
-  allEntries().forEach(e=>modelGroup.appendChild(modelRow(e)));
+// keep `current` on an installed build and gate Generate on it — never silently download via Generate
+function reconcile(){
+  const builds=allBuilds(),cur=builds.find(b=>b.backend+":"+b.variant===current);
+  if(!cur||!cur.installed){const inst=builds.find(b=>b.installed);if(inst)setActive(inst.backend+":"+inst.variant);}
+  const now=buildOf(current);
+  gen.disabled=busy||!(now&&now.installed);
 }
 
-function modelRow(e){
-  const id=e.backend+":"+e.variant, active=(id===current);
+function renderModelGroup(){
+  modelGroup.innerHTML="";
+  const head=el("div","sgrp","Model");head.appendChild(el("span","disk",(CATALOG.disk_gb||0)+" GB"));modelGroup.appendChild(head);
+  const builds=allBuilds();builds.forEach(b=>modelGroup.appendChild(modelRow(b)));
+  if(!builds.some(b=>b.installed))modelGroup.appendChild(el("div","hint","Download a model above to start generating."));
+}
+
+function modelRow(b){
+  const id=b.backend+":"+b.variant,active=(id===current);
   const r=el("div","mrow"+(active?" active":""));
-  r.appendChild(el("span","mic",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>'));
-  r.appendChild(el("div",null,'<div class="mname">'+e.label+'</div><div class="msub">'+e.size_gb+' GB · '+(e.note||'')+'</div>')).style.minWidth="0",r.lastChild.style.flex="1";
+  r.appendChild(el("span","mic",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>'));
+  const sub=b.downloadable?(b.size_gb+" GB · "+(b.note||"")):(b.note||"local model");
+  const info=el("div",null,'<div class="mname">'+b.label+'</div><div class="msub">'+sub+'</div>');info.style.cssText="min-width:0;flex:1";r.appendChild(info);
   const right=el("div");right.style.cssText="display:flex;align-items:center;gap:7px";
-  if(!e.installed){
+  if(b.downloadable&&!b.installed){
     const dl=el("button","mbtn",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>Download');
-    dl.onclick=()=>dlVariant(e,r,dl);right.appendChild(dl);
+    dl.setAttribute("aria-label","Download "+b.label);dl.onclick=()=>dlVariant(b,r,dl);right.appendChild(dl);
   }else if(active){
     right.appendChild(el("span","mtag",'<span class="dot"></span>Active'));
-    right.appendChild(delBtn(e));
+    if(b.downloadable)right.appendChild(delBtn(b));
   }else{
-    const use=el("button","mbtn",null);use.textContent="Use";use.onclick=()=>setActive(id);right.appendChild(use);
-    right.appendChild(delBtn(e));
+    const use=el("button","mbtn",null);use.textContent="Use";use.setAttribute("aria-label","Use "+b.label);use.onclick=()=>setActive(id);right.appendChild(use);
+    if(b.downloadable)right.appendChild(delBtn(b));
   }
   r.appendChild(right);return r;
 }
-function delBtn(e){
-  const d=el("button","mdel",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>');
-  d.title="Delete";d.onclick=()=>delVariant(e);return d;
+function delBtn(b){
+  const d=el("button","mdel",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>');
+  d.title="Delete "+b.label;d.setAttribute("aria-label","Delete "+b.label);d.onclick=()=>delVariant(b);return d;
 }
 
-async function dlVariant(e,r,btn){
-  btn.disabled=true;btn.textContent="Starting…";
+async function dlVariant(b,r,btn){
+  if(DOWNLOADING){showErr("A download is already in progress.");return;}
+  DOWNLOADING=true;btn.disabled=true;btn.textContent="Starting…";
   const pr=el("div","mprog","<i></i>");r.appendChild(pr);const fill=pr.querySelector("i");
   try{
-    const res=await fetch("/api/download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backend:e.backend,variant:e.variant})});
+    const res=await fetch("/api/download",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backend:b.backend,variant:b.variant})});
     if(!res.ok||!res.body)throw new Error("server "+res.status);
     const reader=res.body.getReader(),dec=new TextDecoder();let buf="";
     while(true){const{value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let nl;
       while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(!line.trim())continue;const ev=JSON.parse(line);
         if(ev.type==="progress"){fill.style.width=(ev.total?Math.round(ev.done/ev.total*100):0)+"%";btn.textContent=fmt(ev.done/1e9)+" / "+fmt(ev.total/1e9)+" GB";}
-        else if(ev.type==="done"){await refreshCatalog();}
-        else if(ev.type==="error"){btn.disabled=false;btn.textContent="Retry";showErr(ev.message);}
+        else if(ev.type==="error"){showErr(ev.message);}
       }}
-  }catch(err){btn.disabled=false;btn.textContent="Retry";showErr("Download failed: "+err.message);}
+  }catch(err){showErr("Download failed: "+err.message);}
+  DOWNLOADING=false;await refreshCatalog();
 }
-async function delVariant(e){
-  try{await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backend:e.backend,variant:e.variant})});}
+async function delVariant(b){
+  try{await fetch("/api/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({backend:b.backend,variant:b.variant})});}
   catch(err){showErr("Delete failed: "+err.message);}
   await refreshCatalog();
 }
-async function refreshCatalog(){try{CATALOG=await(await fetch("/api/catalog")).json();}catch(e){}renderModelGroup();}
+async function refreshCatalog(){try{CATALOG=await(await fetch("/api/catalog")).json();}catch(e){}renderModelGroup();reconcile();}
 
 function renderParams(b){
   paramGroups.innerHTML="";PV={};
@@ -256,7 +275,7 @@ function control(p){
   return c;
 }
 
-function setBusy(b){busy=b;gen.disabled=b;}
+function setBusy(b){busy=b;if(b)gen.disabled=true;else reconcile();}
 async function generate(){
   if(busy)return;const p=prompt.value.trim();errBox.classList.remove("show");
   if(!p){showErr("Enter a prompt.");return;}
@@ -272,7 +291,7 @@ async function generate(){
     while(true){const{value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let nl;
       while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(line.trim())handle(JSON.parse(line),p);}}
   }catch(e){showErr("Generation failed: "+e.message);}
-  finally{setBusy(false);clearInterval(timer);progress.classList.remove("show");refreshCatalog();}
+  finally{setBusy(false);clearInterval(timer);progress.classList.remove("show");}
 }
 function handle(ev,p){
   if(ev.type==="step"){barfill.style.width=Math.round(ev.step/ev.total*100)+"%";pstep.textContent="Generating · step "+ev.step+" / "+ev.total;}

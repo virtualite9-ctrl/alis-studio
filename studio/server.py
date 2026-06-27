@@ -190,8 +190,12 @@ class Handler(BaseHTTPRequestHandler):
 
     def _delete(self, req):
         backend = _registry().backends.get(req.get("backend"))
+        if backend is None:
+            self._send(404, "application/json", b'{"ok":false,"error":"unknown backend"}')
+            return
         try:
-            backend.delete(req.get("variant", ""))
+            with _DLLOCK, _LOCK:  # exclusive with an in-flight download (file) and generate (pipe ref)
+                backend.delete(req.get("variant", ""))
             self._send(200, "application/json", b'{"ok":true}')
         except Exception as e:
             self._send(500, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())

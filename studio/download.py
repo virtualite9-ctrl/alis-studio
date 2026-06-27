@@ -32,18 +32,24 @@ def _download_one(url: str, dest: str, total: int, on_bytes) -> None:
         pos = 0
     headers = {"Range": f"bytes={pos}-"} if pos else {}
     with requests.get(url, headers=headers, stream=True, timeout=(30, 120), allow_redirects=True) as r:
-        r.raise_for_status()
+        r.raise_for_status()  # HTTP errors surface as-is, not as a resume hint
         resume = bool(pos) and r.status_code == 206
         pos = pos if resume else 0
         total = total or (pos + int(r.headers.get("content-length") or 0))
         done = pos
-        with open(tmp, "ab" if resume else "wb") as f:
-            for chunk in r.iter_content(4 << 20):
-                f.write(chunk)
-                done += len(chunk)
-                on_bytes(done)
-    if total and done != total:
-        raise OSError(f"incomplete download of {os.path.basename(dest)} ({done}/{total} bytes)")
+        try:
+            with open(tmp, "ab" if resume else "wb") as f:
+                for chunk in r.iter_content(4 << 20):
+                    f.write(chunk)
+                    done += len(chunk)
+                    on_bytes(done)
+        except requests.exceptions.RequestException as e:
+            # a mid-stream drop lands here; .part is kept so the next run resumes
+            raise OSError(f"download of {os.path.basename(dest)} interrupted; re-run to resume") from e
+    # commit only a verified-complete, non-empty file. For length-less (chunked) transfers requests
+    # raises above on a short read, so a clean loop means complete — but never commit an empty result.
+    if (total and done != total) or done == 0:
+        raise OSError(f"incomplete download of {os.path.basename(dest)} ({done}/{total or '?'} bytes)")
     os.replace(tmp, dest)
 
 
