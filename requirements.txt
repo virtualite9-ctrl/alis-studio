@@ -1,0 +1,4 @@
+# Alis Studio runs on the Python standard library alone. Backends bring their own deps:
+#
+# Krea 2 Turbo backend — the pure-MLX port (pulls mlx, mflux, transformers, …):
+krea2-alis-mlx @ git+https://github.com/avlp12/krea2_alis_mlx.git

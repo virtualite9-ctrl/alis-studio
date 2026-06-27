@@ -1,0 +1,40 @@
+[build-system]
+requires = ["setuptools>=64"]
+build-backend = "setuptools.build_meta"
+
+[project]
+name = "alis-studio"
+version = "0.1.0"
+description = "A local, model-agnostic image-generation studio for Apple silicon (MLX)."
+readme = "README.md"
+requires-python = ">=3.10"
+license = { text = "MIT" }
+authors = [{ name = "avlp12" }]
+keywords = ["mlx", "apple-silicon", "text-to-image", "image-generation", "diffusion", "studio"]
+classifiers = [
+    "Environment :: GPU",
+    "Operating System :: MacOS",
+    "Programming Language :: Python :: 3 :: Only",
+    "Topic :: Scientific/Engineering :: Artificial Intelligence",
+    "Topic :: Multimedia :: Graphics",
+]
+# The app itself is pure standard library. The default Krea 2 Turbo backend is pulled from GitHub:
+dependencies = [
+    "krea2-alis-mlx @ git+https://github.com/avlp12/krea2_alis_mlx.git",
+]
+
+[project.scripts]
+alis-studio = "studio.server:serve"
+
+[project.urls]
+Homepage = "https://github.com/avlp12/alis-studio"
+"Krea 2 Turbo backend" = "https://github.com/avlp12/krea2_alis_mlx"
+
+[tool.setuptools]
+packages = ["studio", "studio.backends"]
+
+[tool.ruff]
+line-length = 120
+
+[tool.ruff.lint]
+select = ["F", "E9"]

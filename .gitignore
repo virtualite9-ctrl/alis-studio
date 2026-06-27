@@ -1,0 +1,13 @@
+__pycache__/
+*.pyc
+.venv/
+venv/
+.DS_Store
+# build artifacts
+build/
+dist/
+*.egg-info/
+# weights / outputs (not tracked)
+*.safetensors
+weights/
+out*.png

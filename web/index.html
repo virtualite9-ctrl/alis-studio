@@ -1,0 +1,208 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Alis Studio</title>
+<style>
+:root{
+  --bg:#faf9f5; --surface:#ffffff; --surface-1:#f3f2ec; --surface-2:#ffffff;
+  --text:#22201d; --text-2:#6b6960; --muted:#9b988e;
+  --border:rgba(28,26,23,.10); --border-strong:rgba(28,26,23,.18);
+  --clay:#c4623f; --clay-hover:#ad5436; --on-clay:#ffffff; --ok:#5a9367;
+  --radius:10px; --maxw:560px; --shadow:0 1px 2px rgba(28,26,23,.05);
+  --font:-apple-system,BlinkMacSystemFont,"SF Pro Text","Segoe UI",system-ui,sans-serif;
+  --mono:"SF Mono",ui-monospace,"JetBrains Mono",Menlo,monospace;
+}
+@media (prefers-color-scheme:dark){
+  :root{
+    --bg:#211f1d; --surface:#2b2926; --surface-1:#322f2b; --surface-2:#2b2926;
+    --text:#f2efe7; --text-2:#b4b0a4; --muted:#827e74;
+    --border:rgba(255,255,255,.12); --border-strong:rgba(255,255,255,.22);
+    --clay:#d6795a; --clay-hover:#e08a6c; --on-clay:#1c1a18; --shadow:none;
+  }
+}
+*{box-sizing:border-box}
+html,body{margin:0;height:100%}
+body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15px;line-height:1.5;-webkit-font-smoothing:antialiased}
+.wrap{max-width:var(--maxw);margin:0 auto;padding:30px 20px 80px}
+header{display:flex;align-items:center;justify-content:center;gap:10px;margin:6px 0 24px}
+.logo{width:28px;height:28px;border-radius:8px;background:var(--clay);display:flex;align-items:center;justify-content:center;color:var(--on-clay)}
+.logo svg{width:17px;height:17px}
+.brand{font-size:16px;font-weight:500;letter-spacing:-.01em}
+.sub{font-size:13px;color:var(--muted)}
+.composer{border:1px solid var(--border-strong);border-radius:18px;background:var(--surface-2);box-shadow:var(--shadow);padding:14px 14px 11px}
+#prompt{width:100%;border:none;outline:none;resize:none;background:transparent;color:var(--text);font:inherit;font-size:16px;line-height:1.55;min-height:52px;max-height:200px;padding:2px}
+#prompt::placeholder{color:var(--muted)}
+.row{display:flex;align-items:center;gap:7px;margin-top:10px;flex-wrap:wrap}
+.pill{display:inline-flex;align-items:center;height:34px;border:1px solid var(--border);border-radius:17px;background:var(--surface);color:var(--text-2);font-size:13px}
+select.pill{appearance:none;-webkit-appearance:none;padding:0 28px 0 12px;color:var(--text);cursor:pointer;max-width:230px;text-overflow:ellipsis;
+  background-image:url("data:image/svg+xml;utf8,<svg xmlns='http://www.w3.org/2000/svg' width='14' height='14' viewBox='0 0 24 24' fill='none' stroke='%239b988e' stroke-width='2.2' stroke-linecap='round' stroke-linejoin='round'><path d='M6 9l6 6 6-6'/></svg>");
+  background-repeat:no-repeat;background-position:right 9px center}
+select.pill:hover,.iconbtn:hover,.pill.num:hover{border-color:var(--border-strong)}
+.pill.num{padding:0 4px 0 11px;gap:2px}
+.pill.num label{color:var(--muted);font-size:12px}
+.pill.num input{width:34px;border:none;background:transparent;color:var(--text);font:inherit;font-size:13px;text-align:right;outline:none;-moz-appearance:textfield}
+.pill.num input::-webkit-outer-spin-button,.pill.num input::-webkit-inner-spin-button{-webkit-appearance:none;margin:0}
+.iconbtn{width:34px;height:34px;border:1px solid var(--border);border-radius:17px;background:var(--surface);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;cursor:pointer;padding:0}
+.iconbtn svg{width:17px;height:17px}
+.iconbtn.on{color:var(--ok);border-color:var(--border-strong)}
+.spacer{flex:1}
+.gen{height:36px;padding:0 16px;border:none;border-radius:18px;background:var(--clay);color:var(--on-clay);font:inherit;font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:7px;cursor:pointer;transition:background .12s}
+.gen:hover{background:var(--clay-hover)}
+.gen:disabled{opacity:.55;cursor:default}
+.gen svg{width:16px;height:16px}
+.adv{display:none;gap:7px;margin-top:8px}
+.adv.show{display:flex}
+.progress{display:none;margin:22px 0 6px}
+.progress.show{display:block}
+.bar{height:4px;border-radius:2px;background:var(--surface-1);overflow:hidden}
+.bar i{display:block;height:100%;width:0;background:var(--clay);border-radius:2px;transition:width .25s}
+.pmeta{display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-top:8px;font-family:var(--mono)}
+#results{margin-top:18px;display:flex;flex-direction:column;gap:16px}
+.card{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-2)}
+.card img{display:block;width:100%}
+.cap{display:flex;align-items:center;gap:10px;padding:10px 12px}
+.cap .txt{font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.cap .meta{margin-left:auto;font-size:12px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
+.cap a{color:var(--text-2);display:inline-flex;cursor:pointer}
+.cap a:hover{color:var(--text)}
+.cap a svg{width:17px;height:17px}
+.empty{margin-top:26px;text-align:center;color:var(--muted);font-size:14px}
+.empty svg{width:100%;max-width:520px;border-radius:14px;border:1px solid var(--border);display:block;margin:0 auto 14px;opacity:.85}
+.err{display:none;margin-top:16px;border:1px solid var(--border);border-left:3px solid var(--clay);background:var(--surface-1);color:var(--text);font-size:13px;padding:11px 13px;border-radius:0 var(--radius) var(--radius) 0}
+.err.show{display:block}
+.hint{text-align:center;color:var(--muted);font-size:12px;margin-top:22px}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/><path d="M19 14l.9 2.4 2.1.7-2.1.8-.9 2.1-.9-2.1-2.1-.8 2.1-.7z"/></svg></span>
+    <span class="brand">Alis Studio</span>
+    <span class="sub">MLX · Apple silicon</span>
+  </header>
+
+  <div class="composer">
+    <textarea id="prompt" rows="2" placeholder="Describe an image to generate…">a serene mountain lake at sunrise, mist over the water</textarea>
+    <div class="row">
+      <select class="pill" id="model" title="Model"></select>
+      <select class="pill" id="size" title="Image size"></select>
+      <span class="pill num" title="Denoising steps"><label for="steps">steps</label><input id="steps" type="number" min="1" max="50" value="8"></span>
+      <button class="iconbtn" id="advbtn" aria-label="More options" title="More options"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><circle cx="12" cy="12" r="3"/><path d="M19.4 15a1.65 1.65 0 0 0 .33 1.82l.06.06a2 2 0 1 1-2.83 2.83l-.06-.06a1.65 1.65 0 0 0-1.82-.33 1.65 1.65 0 0 0-1 1.51V21a2 2 0 0 1-4 0v-.09A1.65 1.65 0 0 0 9 19.4a1.65 1.65 0 0 0-1.82.33l-.06.06a2 2 0 1 1-2.83-2.83l.06-.06a1.65 1.65 0 0 0 .33-1.82 1.65 1.65 0 0 0-1.51-1H3a2 2 0 0 1 0-4h.09A1.65 1.65 0 0 0 4.6 9a1.65 1.65 0 0 0-.33-1.82l-.06-.06a2 2 0 1 1 2.83-2.83l.06.06a1.65 1.65 0 0 0 1.82.33H9a1.65 1.65 0 0 0 1-1.51V3a2 2 0 0 1 4 0v.09a1.65 1.65 0 0 0 1 1.51 1.65 1.65 0 0 0 1.82-.33l.06-.06a2 2 0 1 1 2.83 2.83l-.06.06a1.65 1.65 0 0 0-.33 1.82V9a1.65 1.65 0 0 0 1.51 1H21a2 2 0 0 1 0 4h-.09a1.65 1.65 0 0 0-1.51 1z"/></svg></button>
+      <button class="iconbtn on" id="safety" aria-label="NSFW safety filter on" title="NSFW safety filter: on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></button>
+      <span class="spacer"></span>
+      <button class="gen" id="gen" disabled><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/></svg>Generate</button>
+    </div>
+    <div class="adv" id="adv">
+      <span class="pill num" title="Random seed"><label for="seed">seed</label><input id="seed" type="number" min="0" value="0"></span>
+      <span class="pill num" title="Number of images"><label for="images">images</label><input id="images" type="number" min="1" max="4" value="1"></span>
+    </div>
+  </div>
+
+  <div class="progress" id="progress">
+    <div class="bar"><i id="barfill"></i></div>
+    <div class="pmeta"><span id="pstep">Loading model…</span><span id="ptime"></span></div>
+  </div>
+
+  <div class="err" id="err"></div>
+  <div id="results"></div>
+
+  <div class="empty" id="empty">
+    <svg viewBox="0 0 520 300" aria-hidden="true"><rect width="520" height="300" fill="#e7ecf2"/><circle cx="386" cy="76" r="32" fill="#e9a87e"/><polygon points="0,212 130,95 260,212" fill="#c7d0db"/><polygon points="162,232 326,70 512,232" fill="#aebac8"/><polygon points="294,130 326,70 358,130" fill="#f1efe9"/><rect y="210" width="520" height="90" fill="#d7dfe8"/><ellipse cx="386" cy="240" rx="24" ry="6" fill="#e9c4a8" opacity="0.5"/></svg>
+    Your images will appear here.
+  </div>
+
+  <div class="hint">runs locally on Apple silicon · powered by MLX</div>
+</div>
+
+<script>
+const $ = s => document.querySelector(s);
+const prompt=$("#prompt"), gen=$("#gen"), results=$("#results"), empty=$("#empty");
+const progress=$("#progress"), barfill=$("#barfill"), pstep=$("#pstep"), ptime=$("#ptime"), errBox=$("#err");
+const modelSel=$("#model"), sizeSel=$("#size"), stepsIn=$("#steps"), imagesIn=$("#images");
+const safetyBtn=$("#safety"); let safetyOn=true, BACKENDS=[], busy=false, t0=0, timer=null;
+
+prompt.addEventListener("input",()=>{prompt.style.height="auto";prompt.style.height=Math.min(prompt.scrollHeight,200)+"px";});
+$("#advbtn").addEventListener("click",()=>$("#adv").classList.toggle("show"));
+safetyBtn.addEventListener("click",()=>{safetyOn=!safetyOn;safetyBtn.classList.toggle("on",safetyOn);
+  safetyBtn.title="NSFW safety filter: "+(safetyOn?"on":"off");safetyBtn.setAttribute("aria-label","NSFW safety filter "+(safetyOn?"on":"off"));});
+prompt.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")generate();});
+modelSel.addEventListener("change",applyBackend);
+gen.addEventListener("click",generate);
+
+const SVG_DL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
+function fmt(n){return (Math.round(n*10)/10).toFixed(1);}
+function setBusy(b){busy=b;gen.disabled=b;}
+function showErr(m){errBox.textContent=m;errBox.classList.add("show");}
+function currentBackend(){const id=(modelSel.value||"").split(":")[0];return BACKENDS.find(b=>b.id===id);}
+
+function applyBackend(){
+  const b=currentBackend(); if(!b) return;
+  sizeSel.innerHTML="";
+  b.sizes.forEach(s=>{const o=document.createElement("option");o.value=s;o.textContent=s+"²";if(s===b.default_size)o.selected=true;sizeSel.appendChild(o);});
+  stepsIn.value=b.default_steps; stepsIn.max=b.max_steps||50;
+  imagesIn.max=b.max_images||4; if(+imagesIn.value>imagesIn.max) imagesIn.value=imagesIn.max;
+}
+
+async function loadModels(){
+  try{
+    const data=await (await fetch("/api/models")).json();
+    BACKENDS=data.backends||[];
+    if(!BACKENDS.length){showErr("No models are available. Install a backend's dependencies and restart.");return;}
+    modelSel.innerHTML="";
+    BACKENDS.forEach(b=>{
+      const og=document.createElement("optgroup"); og.label=b.label;
+      b.variants.forEach(v=>{const o=document.createElement("option");o.value=b.id+":"+v.id;o.textContent=v.label;og.appendChild(o);});
+      modelSel.appendChild(og);
+    });
+    applyBackend(); gen.disabled=false;
+  }catch(e){ showErr("Couldn't reach the server: "+e.message); }
+}
+loadModels();
+
+async function generate(){
+  if(busy) return;
+  const p=prompt.value.trim(); errBox.classList.remove("show");
+  if(!p){showErr("Enter a prompt.");return;}
+  if(!modelSel.value){showErr("No model selected.");return;}
+  const body={prompt:p, model:modelSel.value, size:+sizeSel.value, steps:+stepsIn.value,
+    seed:+$("#seed").value, num_images:+imagesIn.value, safety:safetyOn};
+  setBusy(true); empty.style.display="none";
+  progress.classList.add("show"); barfill.style.width="0%"; pstep.textContent="Loading model…"; ptime.textContent="";
+  t0=Date.now(); clearInterval(timer); timer=setInterval(()=>{ptime.textContent=fmt((Date.now()-t0)/1000)+"s";},100);
+  try{
+    const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    if(!res.ok||!res.body) throw new Error("server error "+res.status);
+    const reader=res.body.getReader(), dec=new TextDecoder(); let buf="";
+    while(true){
+      const {value,done}=await reader.read(); if(done) break;
+      buf+=dec.decode(value,{stream:true}); let nl;
+      while((nl=buf.indexOf("\n"))>=0){
+        const line=buf.slice(0,nl); buf=buf.slice(nl+1); if(!line.trim()) continue;
+        handle(JSON.parse(line),p);
+      }
+    }
+  }catch(e){ showErr("Generation failed: "+e.message); }
+  finally{ setBusy(false); clearInterval(timer); progress.classList.remove("show"); }
+}
+
+function handle(ev,p){
+  if(ev.type==="step"){ barfill.style.width=Math.round(ev.step/ev.total*100)+"%"; pstep.textContent="Generating · step "+ev.step+" / "+ev.total; }
+  else if(ev.type==="done"){ barfill.style.width="100%"; ev.images.forEach((uri,i)=>renderCard(uri,p,ev.meta,i,ev.images.length)); }
+  else if(ev.type==="error"){ showErr(ev.message||"Generation failed."); }
+}
+
+function renderCard(uri,p,meta,i,n){
+  const card=document.createElement("div"); card.className="card";
+  const seedLabel=meta.seed+(n>1?("·"+(i+1)):"");
+  card.innerHTML='<img alt="'+p.replace(/"/g,"&quot;")+'" src="'+uri+'">'+
+    '<div class="cap"><span class="txt">'+p+'</span>'+
+    '<span class="meta">'+meta.model+' · '+meta.size+'² · '+meta.steps+' steps · seed '+seedLabel+' · '+fmt(meta.seconds)+'s</span>'+
+    '<a title="Download" aria-label="Download">'+SVG_DL+'</a></div>';
+  card.querySelector("a").onclick=()=>{const a=document.createElement("a");a.href=uri;a.download="alis_"+meta.seed+(n>1?("_"+(i+1)):"")+".png";a.click();};
+  results.insertBefore(card,results.firstChild);
+}
+</script>
+</body>
+</html>
