@@ -30,6 +30,7 @@ button{font-family:inherit;cursor:pointer}
 .logo{width:26px;height:26px;border-radius:7px;background:var(--clay);display:flex;align-items:center;justify-content:center;color:var(--on-clay)}
 .logo svg{width:16px;height:16px}
 .brand{font-size:15px;font-weight:500;letter-spacing:-.01em}
+.ver{font-size:11px;font-weight:500;line-height:1;color:var(--muted);background:var(--surface-1);border:0.5px solid var(--border);border-radius:6px;padding:3px 6px;letter-spacing:.02em;cursor:default;user-select:none}
 .chip{display:inline-flex;align-items:center;gap:7px;height:28px;padding:0 12px;border:0.5px solid var(--border);border-radius:14px;background:var(--surface);font-size:13px;color:var(--text)}
 .chip .dot{width:7px;height:7px;border-radius:50%;background:var(--ok)}
 .main{max-width:920px;margin:0 auto;padding:22px 18px 70px;display:flex;gap:20px;align-items:flex-start}
@@ -44,6 +45,7 @@ button{font-family:inherit;cursor:pointer}
 .iconbtn:hover{border-color:var(--border-strong)}.iconbtn svg{width:17px;height:17px}.iconbtn.on{color:var(--ok);border-color:var(--border-strong)}
 .gen{height:36px;padding:0 18px;border:none;border-radius:18px;background:var(--clay);color:var(--on-clay);font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:7px;transition:background .12s}
 .gen:hover{background:var(--clay-hover)}.gen:disabled{opacity:.55;cursor:default}.gen svg{width:16px;height:16px}
+.gen.stop{background:var(--surface-1);color:var(--text);border:0.5px solid var(--border-strong)}.gen.stop:hover{background:var(--surface)}
 .panel{border:0.5px solid var(--border);border-radius:14px;background:var(--surface-2);padding:14px 15px}
 .ptitle{font-size:13px;font-weight:500;margin-bottom:4px}
 .sgrp{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em;margin:14px 0 9px;display:flex;align-items:center}
@@ -61,6 +63,22 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .seedrow{display:flex;gap:6px}.seedrow input{flex:1}
 .sq{width:32px;height:32px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;flex:none}.sq:hover{border-color:var(--border-strong)}.sq svg{width:16px;height:16px}
 .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
+.phint{font-size:12px;color:var(--muted);margin:7px 2px 0;line-height:1.4}.phint:empty{display:none}
+.enhbtn{height:34px;padding:0 12px;border:0.5px solid var(--border-strong);border-radius:17px;background:var(--surface);color:var(--text);font-size:13px;display:none;align-items:center;gap:6px}
+.enhbtn.show{display:inline-flex}.enhbtn:hover{background:var(--surface-1)}.enhbtn:disabled{opacity:.55}.enhbtn svg{width:15px;height:15px}
+.swrow{display:flex;align-items:center;gap:10px;padding:10px 0 2px;border-top:0.5px solid var(--border);margin-top:12px}
+.swrow .swtxt{flex:1;min-width:0}.swn{font-size:13px;color:var(--text)}.swh{font-size:11px;color:var(--muted);margin-top:2px;line-height:1.4}
+.sw{width:38px;height:22px;border-radius:11px;background:var(--surface-1);border:0.5px solid var(--border-strong);position:relative;flex:none;cursor:pointer;transition:background .15s}
+.sw i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text-2);transition:transform .15s,background .15s}
+.sw.on{background:var(--clay);border-color:var(--clay)}.sw.on i{transform:translateX(16px);background:var(--on-clay)}
+.sw.disabled{opacity:.45;cursor:not-allowed}
+.modal{position:fixed;inset:0;background:rgba(20,18,16,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal.show{display:flex}
+.mbox{background:var(--surface-2);border:0.5px solid var(--border-strong);border-radius:16px;max-width:390px;padding:18px 18px 14px;box-shadow:0 16px 44px rgba(20,18,16,.3)}
+.mbox h3{margin:0 0 8px;font-size:15px;font-weight:600;color:var(--text)}.mbox p{margin:0 0 15px;font-size:13px;color:var(--text-2);line-height:1.5}
+.mbtns{display:flex;gap:8px;justify-content:flex-end}
+.mbtn{height:34px;padding:0 14px;border-radius:9px;border:0.5px solid var(--border-strong);background:var(--surface);color:var(--text);font-size:13px;font-weight:500}
+.mbtn:hover{background:var(--surface-1)}.mbtn.primary{background:var(--clay);color:var(--on-clay);border-color:var(--clay)}.mbtn.primary:hover{background:var(--clay-hover)}
 textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-height:1.4}
 .disabled{opacity:.5;pointer-events:none}
 .picker{position:relative}
@@ -102,6 +120,7 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
 <div class="top">
   <span class="logo" aria-hidden="true"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/><path d="M19 14l.9 2.4 2.1.7-2.1.8-.9 2.1-.9-2.1-2.1-.8 2.1-.7z"/></svg></span>
   <span class="brand">Alis Studio</span>
+  <span class="ver" id="ver" title="Alis Studio v__ALIS_VERSION__">v__ALIS_VERSION__</span>
   <span style="flex:1"></span>
   <span class="chip" id="activeChip" title="Active model"><span class="dot"></span><span id="activeName">—</span></span>
 </div>
@@ -112,10 +131,12 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
       <textarea id="prompt" rows="2" placeholder="Describe an image to generate…">a serene mountain lake at sunrise, mist over the water</textarea>
       <div class="crow">
         <button class="iconbtn on" id="safety" aria-label="NSFW safety filter on" title="NSFW safety filter: on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></button>
+        <button class="enhbtn" id="enhbtn" title="Rewrite the prompt in English with a local model"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/></svg>Enhance</button>
         <span style="flex:1"></span>
         <button class="gen" id="gen" disabled><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/></svg>Generate</button>
       </div>
     </div>
+    <div class="phint" id="phint"></div>
     <div class="progress" id="progress"><div class="bar"><i id="barfill"></i></div><div class="pmeta"><span id="pstep">Loading model…</span><span id="ptime"></span></div></div>
     <div class="err" id="err"></div>
     <div id="results"></div>
@@ -125,22 +146,27 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
     </div>
   </div>
   <div class="right">
-    <div class="panel"><div class="ptitle">Settings</div><div id="modelGroup"></div><div id="paramGroups"></div></div>
+    <div class="panel"><div class="ptitle">Settings</div><div id="modelGroup"></div><div id="paramGroups"></div><div id="enhanceRow"></div></div>
   </div>
 </div>
+
+<div class="modal" id="modal"><div class="mbox"><h3 id="mtitle"></h3><p id="mtext"></p><div class="mbtns"><button class="mbtn" id="mcancel">Cancel</button><button class="mbtn primary" id="mok">Enable</button></div></div></div>
 
 <script>
 const $=s=>document.querySelector(s);
 const prompt=$("#prompt"),gen=$("#gen"),results=$("#results"),empty=$("#empty"),errBox=$("#err");
 const progress=$("#progress"),barfill=$("#barfill"),pstep=$("#pstep"),ptime=$("#ptime");
 const modelGroup=$("#modelGroup"),paramGroups=$("#paramGroups"),activeName=$("#activeName"),safetyBtn=$("#safety");
-let BACKENDS=[],CATALOG={backends:[],disk_gb:0},PV={},current="",safetyOn=true,busy=false,t0=0,timer=null;
+let BACKENDS=[],CATALOG={backends:[],disk_gb:0},PV={},current="",safetyOn=true,busy=false,t0=0,timer=null,aborter=null;
+let SYS={ram_gib:0,constrained:false,enhance_available:false,enhance_model:""},enhanceOn=false;
 const SVG_DL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
 const SVG_CUBE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>';
 const SVG_CHECK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.4" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M5 12l5 5 9-10"/></svg>';
 const SVG_DLI='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4M7 10l5 5 5-5M12 15V3"/></svg>';
 const SVG_TRASH='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M3 6h18M8 6V4h8v2M6 6l1 14h10l1-14"/></svg>';
 const SVG_CHEVD='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2.2" stroke-linecap="round" stroke-linejoin="round" aria-hidden="true"><path d="M6 9l6 6 6-6"/></svg>';
+const SVG_GEN='<svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/></svg>';
+const SVG_STOP='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" width="12" height="12" rx="2.5"/></svg>';
 const fmt=n=>(Math.round(n*10)/10).toFixed(1);
 const showErr=m=>{errBox.textContent=m;errBox.classList.add("show");};
 const m16=(x,min,max)=>Math.max(min,Math.min(max,Math.round(x/16)*16));
@@ -150,7 +176,8 @@ const backendOf=v=>BACKENDS.find(b=>b.id===(v||"").split(":")[0]);
 prompt.addEventListener("input",()=>{prompt.style.height="auto";prompt.style.height=Math.min(prompt.scrollHeight,220)+"px";});
 prompt.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")generate();});
 safetyBtn.addEventListener("click",()=>{safetyOn=!safetyOn;safetyBtn.classList.toggle("on",safetyOn);safetyBtn.title="NSFW safety filter: "+(safetyOn?"on":"off");});
-gen.addEventListener("click",generate);
+gen.addEventListener("click",()=>{busy?stopGen():generate();});
+$("#enhbtn").addEventListener("click",doEnhance);
 document.addEventListener("click",e=>{if(POPEN&&!e.target.closest(".picker")){POPEN=false;const p=document.querySelector(".mpop");if(p)p.classList.remove("open");}});
 
 async function loadAll(){
@@ -163,6 +190,41 @@ async function loadAll(){
     setActive(first.backend+":"+first.variant,true);
     reconcile();
   }catch(e){showErr("Couldn’t reach the server: "+e.message);}
+  try{SYS=await fetch("/api/system").then(r=>r.json());}catch(e){}
+  try{enhanceOn=!!SYS.enhance_available&&localStorage.getItem("alis_enhance")==="1";}catch(e){}
+  renderEnhance();
+}
+function persistEnhance(){try{localStorage.setItem("alis_enhance",enhanceOn?"1":"0");}catch(e){}}
+function renderEnhance(){
+  const avail=SYS.enhance_available;
+  const hint=!avail?'Install mlx-lm to enable — pip install "alis-studio[rewrite]"'
+    :SYS.constrained?('Loads a ~2.3 GB local model; may strain memory on this '+SYS.ram_gib+' GB Mac.')
+    :'Translates non-English prompts to English and enriches them — runs locally (~2.3 GB model).';
+  $("#enhanceRow").innerHTML='<div class="swrow"><div class="swtxt"><div class="swn">Prompt enhancer</div><div class="swh">'+hint+'</div></div><div class="sw'+(enhanceOn?' on':'')+(avail?'':' disabled')+'" id="enhSw" role="switch" aria-checked="'+(enhanceOn?'true':'false')+'"><i></i></div></div>';
+  $("#enhSw").onclick=()=>{if(avail)toggleEnhance();};
+  $("#enhbtn").classList.toggle("show",enhanceOn&&avail);
+}
+function toggleEnhance(){
+  if(enhanceOn){enhanceOn=false;persistEnhance();renderEnhance();return;}
+  const on=()=>{enhanceOn=true;persistEnhance();renderEnhance();};
+  if(SYS.constrained)showModal("Enable prompt enhancer?","This loads a local model ("+(SYS.enhance_model.split("/").pop()||"~2.3 GB")+") that runs alongside the image model. On this Mac ("+SYS.ram_gib+" GB) they may compete for memory and slow down or run out of memory. Enable anyway?",on);
+  else on();
+}
+function showModal(title,text,onok){
+  $("#mtitle").textContent=title;$("#mtext").textContent=text;const m=$("#modal");m.classList.add("show");
+  $("#mok").onclick=()=>{m.classList.remove("show");onok&&onok();};
+  $("#mcancel").onclick=()=>m.classList.remove("show");
+}
+async function doEnhance(){
+  const p=prompt.value.trim();if(!p||busy)return;
+  const enh=$("#enhbtn"),old=enh.innerHTML;enh.disabled=true;enh.innerHTML=SVG_GEN+"Enhancing…";errBox.classList.remove("show");
+  try{
+    const r=await fetch("/api/enhance",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({prompt:p})});
+    const d=await r.json().catch(()=>({}));
+    if(!r.ok)throw new Error(d.error||("server "+r.status));
+    prompt.value=d.rewritten;prompt.dispatchEvent(new Event("input"));
+  }catch(e){showErr("Enhance failed: "+e.message);}
+  finally{enh.disabled=false;enh.innerHTML=old;}
 }
 let DOWNLOADING=false;
 let POPEN=false;   // is the model picker popover open
@@ -183,6 +245,7 @@ function setActive(model,initial){
   current=model;
   const b=backendOf(model),bld=buildOf(model);
   activeName.textContent=b.label+" · "+(bld?bld.label.split(" · ")[0]:model.split(":")[1]);
+  $("#phint").textContent=b.prompt_note||"";
   if(initial||changedBackend)renderParams(b);
   renderModelGroup();
 }
@@ -293,7 +356,8 @@ function control(p){
   return c;
 }
 
-function setBusy(b){busy=b;if(b)gen.disabled=true;else reconcile();}
+function setBusy(b){busy=b;if(b){gen.disabled=false;gen.classList.add("stop");gen.innerHTML=SVG_STOP+"Stop";}else{gen.classList.remove("stop");gen.innerHTML=SVG_GEN+"Generate";reconcile();}}
+function stopGen(){if(!busy)return;pstep.textContent="Stopping…";fetch("/api/cancel",{method:"POST"}).catch(()=>{});if(aborter)aborter.abort();}
 async function generate(){
   if(busy)return;const p=prompt.value.trim();errBox.classList.remove("show");
   if(!p){showErr("Enter a prompt.");return;}
@@ -302,18 +366,20 @@ async function generate(){
   setBusy(true);empty.style.display="none";
   progress.classList.add("show");barfill.style.width="0%";pstep.textContent="Loading model…";ptime.textContent="";
   t0=Date.now();clearInterval(timer);timer=setInterval(()=>ptime.textContent=fmt((Date.now()-t0)/1000)+"s",100);
+  aborter=new AbortController();
   try{
-    const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body)});
+    const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:aborter.signal});
     if(!res.ok||!res.body)throw new Error("server error "+res.status);
     const reader=res.body.getReader(),dec=new TextDecoder();let buf="";
     while(true){const{value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let nl;
       while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(line.trim())handle(JSON.parse(line),p);}}
-  }catch(e){showErr("Generation failed: "+e.message);}
-  finally{setBusy(false);clearInterval(timer);progress.classList.remove("show");}
+  }catch(e){if(e.name!=="AbortError")showErr("Generation failed: "+e.message);}
+  finally{aborter=null;setBusy(false);clearInterval(timer);progress.classList.remove("show");}
 }
 function handle(ev,p){
   if(ev.type==="step"){barfill.style.width=Math.round(ev.step/ev.total*100)+"%";pstep.textContent="Generating · step "+ev.step+" / "+ev.total;}
   else if(ev.type==="done"){barfill.style.width="100%";ev.images.forEach((u,i)=>renderCard(u,p,ev.meta,i,ev.images.length));}
+  else if(ev.type==="cancelled"){pstep.textContent="Stopped.";}
   else if(ev.type==="error"){showErr(ev.message||"Generation failed.");}
 }
 function renderCard(uri,p,meta,i,n){
@@ -322,6 +388,8 @@ function renderCard(uri,p,meta,i,n){
   card.querySelector("a").onclick=()=>{const a=document.createElement("a");a.href=uri;a.download="alis_"+meta.seed+(n>1?("_"+(i+1)):"")+".png";a.click();};
   results.insertBefore(card,results.firstChild);
 }
+// version is normally substituted server-side; fall back to /api/version if served raw
+if($("#ver").textContent.includes("__ALIS")){fetch("/api/version").then(r=>r.json()).then(d=>{const v="v"+d.version;$("#ver").textContent=v;$("#ver").title="Alis Studio "+v;}).catch(()=>$("#ver").remove());}
 loadAll();
 </script>
 </body>
