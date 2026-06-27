@@ -7,9 +7,10 @@ dependencies aren't installed are skipped automatically, so the app runs with wh
 from __future__ import annotations
 
 from .backends.krea2 import Krea2Backend
+from .backends.mflux_models import FluxDevBackend, FluxSchnellBackend, QwenImageBackend
 
-# register additional models here, e.g.:  from .backends.flux import FluxBackend
-BACKENDS = [Krea2Backend]
+# register additional models here — a backend whose deps aren't importable is skipped automatically
+BACKENDS = [Krea2Backend, QwenImageBackend, FluxSchnellBackend, FluxDevBackend]
 
 
 class Registry:

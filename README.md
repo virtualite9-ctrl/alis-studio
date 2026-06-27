@@ -4,9 +4,9 @@ A local, **model-agnostic** image-generation studio for **Apple silicon** — a 
 web UI that runs text-to-image models entirely on your Mac with [MLX](https://github.com/ml-explore/mlx).
 No cloud, no accounts, your images never leave your machine.
 
-The first model it ships with is **[Krea 2 Turbo](https://github.com/avlp12/krea2_alis_mlx)**
-(a 12.9B text-to-image model, pure-MLX). Other models plug in as small backends — see
-[Adding a model](#adding-a-model).
+Ships with **[Krea 2 Turbo](https://github.com/avlp12/krea2_alis_mlx)** (pure-MLX), plus
+**Qwen-Image** and **FLUX.1** (schnell / dev) via [mflux](https://github.com/filipstrand/mflux).
+More models plug in as small backends — see [Adding a model](#adding-a-model).
 
 ![Alis Studio](assets/screenshot.png)
 
@@ -47,14 +47,23 @@ M3 Ultra (8-step Turbo; slower chips take longer).
 
 ## Models
 
-The **model** dropdown and the **Models** manager are built from whatever backends are installed —
-the UI discovers them at startup via `/api/models` and `/api/catalog`, so adding a model needs no
-UI changes. Browse, download, and delete builds in the manager; switching the active model loads
-that build on demand (and frees the previous one — two 12.9B models won't fit in memory at once).
+The **Model** section in Settings (and the whole settings panel) is built from whatever backends are
+installed — the UI discovers them at startup via `/api/models` and `/api/catalog`, so adding a model
+needs no UI changes. Each model's builds are grouped under its name; switch with **Use**, manage
+downloads inline, and the previous build is freed when you switch (two big models won't fit at once).
 
-| Model | Backend | Builds |
+| Model | Builds | Download |
 |---|---|---|
-| **Krea 2 Turbo** | `krea2-alis-mlx` | 8-bit (best quality, 14.2 GB) · mixed-4/8 (smaller, 9.8 GB). 8-step Turbo. |
+| **Krea 2 Turbo** | 8-bit (14.2 GB) · mixed-4/8 (9.8 GB). 8-step Turbo. | managed in-app (resumable, with progress) |
+| **Qwen-Image** | 8/4-bit, bf16. Apache-2.0, open. | auto on first use via mflux (~40 GB) |
+| **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |
+| **FLUX.1 dev** | 8/4-bit, bf16. Non-commercial, **gated**. | auto on first use via mflux (~24 GB) |
+
+Krea 2 Turbo ships **explicit** download management (our own resumable HTTP-bridge downloader with a
+live progress bar). The FLUX / Qwen-Image backends are handled by [mflux](https://github.com/filipstrand/mflux),
+which downloads the weights on first **Generate**. The **FLUX** repos are **gated** — accept the
+license on Hugging Face and run `huggingface-cli login` first, or Alis Studio shows an actionable
+error. Qwen-Image is open and needs no access.
 
 ---
 

@@ -63,6 +63,8 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
 textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-height:1.4}
 .disabled{opacity:.5;pointer-events:none}
+.mhdr{font-size:12px;font-weight:500;color:var(--text);margin:13px 0 7px}
+#modelGroup .mhdr:first-of-type{margin-top:3px}
 .mrow{display:flex;align-items:center;gap:10px;padding:9px 10px;border:0.5px solid var(--border);border-radius:10px;background:var(--surface-2);margin-bottom:7px;flex-wrap:wrap}
 .mrow.active{border-color:var(--clay)}
 .mic{width:30px;height:30px;border-radius:7px;background:var(--surface-1);display:flex;align-items:center;justify-content:center;color:var(--text-2);flex:none}.mic svg{width:16px;height:16px}
@@ -153,7 +155,7 @@ function allBuilds(){
   const out=[];
   BACKENDS.forEach(b=>b.variants.forEach(v=>{const c=cat[b.id+":"+v.id];
     out.push({backend:b.id,blabel:b.label,variant:v.id,label:v.label,
-      installed:c?!!c.installed:true,downloadable:!!c,size_gb:c?c.size_gb:null,note:c?c.note:null});}));
+      installed:c?!!c.installed:true,downloadable:!!c,size_gb:c?c.size_gb:null,note:c?c.note:(b.info||null)});}));
   return out;
 }
 const buildOf=model=>allBuilds().find(b=>b.backend+":"+b.variant===model);
@@ -178,8 +180,12 @@ function reconcile(){
 function renderModelGroup(){
   modelGroup.innerHTML="";
   const head=el("div","sgrp","Model");head.appendChild(el("span","disk",(CATALOG.disk_gb||0)+" GB"));modelGroup.appendChild(head);
-  const builds=allBuilds();builds.forEach(b=>modelGroup.appendChild(modelRow(b)));
-  if(!builds.some(b=>b.installed))modelGroup.appendChild(el("div","hint","Download a model above to start generating."));
+  const builds=allBuilds(),byB={};
+  builds.forEach(b=>(byB[b.backend]=byB[b.backend]||[]).push(b));   // group rows under each model name
+  Object.values(byB).forEach(grp=>{
+    modelGroup.appendChild(el("div","mhdr",grp[0].blabel));
+    grp.forEach(b=>modelGroup.appendChild(modelRow(b)));
+  });
 }
 
 function modelRow(b){

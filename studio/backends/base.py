@@ -21,9 +21,10 @@ from __future__ import annotations
 class Backend:
     id = ""                      # stable id, e.g. "krea2-turbo"
     label = ""                   # display name, e.g. "Krea 2 Turbo"
+    info = ""                    # one-line note shown for non-downloadable models (e.g. "auto-downloads on first use")
     variants: list[dict] = []    # selectable builds: [{"id": "8bit", "label": "8-bit · best quality"}]
     params: list[dict] = []      # settings schema (see module docstring)
-    catalog: list[dict] = []     # downloadable builds (see studio/registry conventions)
+    catalog: list[dict] = []     # downloadable builds (see studio/registry conventions); empty = managed elsewhere
 
     @classmethod
     def is_available(cls) -> bool:
@@ -32,7 +33,8 @@ class Backend:
         return True
 
     def meta(self) -> dict:
-        return {"id": self.id, "label": self.label, "variants": self.variants, "params": self.params}
+        return {"id": self.id, "label": self.label, "info": self.info,
+                "variants": self.variants, "params": self.params}
 
     def generate(self, *, prompt: str, variant: str, params: dict, step_callback):
         """Return a list of PIL.Image. `params` carries the resolved settings (width, height,
