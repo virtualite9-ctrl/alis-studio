@@ -11,3 +11,7 @@ dist/
 *.safetensors
 weights/
 out*.png
+
+# transient agent/session context (not part of the project)
+AGENTS.md
+.codex/
