@@ -121,7 +121,10 @@ class QwenImageBackend(Backend):
     min_ram_gib = 32   # ~20B; large (~40 GB at 8-bit) → wants a roomy Mac
     prompt_note = "Understands Korean and other languages natively (Qwen2.5 text encoder)."
     info = "Apache-2.0 (open) · large (~40 GB), downloads on first use via mflux"
-    variants = [{"id": "8bit", "label": "8-bit"}, {"id": "4bit", "label": "4-bit"}, {"id": "bf16", "label": "bf16"}]
+    # No 4-bit: Qwen-Image's ~20B transformer is too sensitive to 4-bit (mflux blanket-quantizes
+    # the AdaLN modulation + output projection → grainy/noisy output; mflux's own docs warn ≤6-bit
+    # "degrades a lot more compared to Flux"). 8-bit is the floor for clean output. See issue #9.
+    variants = [{"id": "8bit", "label": "8-bit"}, {"id": "bf16", "label": "bf16"}]
     params = _flux_params(default_steps=20, max_steps=50, guidance_default=4.0, guidance_fixed=False, negative=True)
 
     @classmethod

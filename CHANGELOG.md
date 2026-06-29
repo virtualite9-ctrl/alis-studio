@@ -8,6 +8,16 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.6.3] — 2026-06-29
+
+### Fixed
+- **Qwen-Image 4-bit produced noisy/grainy images** ([#9](https://github.com/avlp12/alis-studio/issues/9)).
+  Qwen-Image's ~20B transformer is too sensitive to 4-bit quantization — mflux blanket-quantizes its
+  AdaLN modulation and output-projection layers, so the composition is right but the image is grainy
+  (mflux's own docs warn that ≤6-bit "degrades a lot more compared to Flux"). Reproduced and confirmed
+  4-bit noisy vs 8-bit clean. **Removed the 4-bit option for Qwen-Image; it now defaults to 8-bit**
+  (bf16 also available). FLUX 4-bit is unaffected and stays.
+
 ## [0.6.2] — 2026-06-29
 
 ### Added
