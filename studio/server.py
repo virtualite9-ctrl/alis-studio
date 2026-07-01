@@ -205,26 +205,26 @@ def _safe_id(gid: str) -> bool:
     return bool(gid) and all(c.isalnum() or c in "-_" for c in gid)
 
 
-def _gallery_save(images, prompt, meta) -> None:
-    """Persist each generated image + its metadata to the on-disk gallery (best-effort)."""
+def _gallery_write(im, gid, ts, prompt, meta) -> str:
+    """The one writer: persist a single image + its metadata json to the gallery. Returns the id."""
     d = _gallery_dir()
-    base = int(time.time() * 1000)
-    for i, im in enumerate(images):
-        gid = f"{base}-{int(meta.get('seed', 0))}-{i}"
-        im.save(os.path.join(d, gid + ".png"))
-        with open(os.path.join(d, gid + ".json"), "w") as f:
-            json.dump({"id": gid, "prompt": prompt, "ts": base, **meta}, f)
-
-
-def _gallery_save_one(im, prompt, meta) -> str:
-    """Persist a single image + metadata to the gallery and return its id (used by upscale)."""
-    d = _gallery_dir()
-    ts = int(time.time() * 1000)
-    gid = f"{ts}-{int(meta.get('seed', 0))}-0"
     im.save(os.path.join(d, gid + ".png"))
     with open(os.path.join(d, gid + ".json"), "w") as f:
         json.dump({"id": gid, "prompt": prompt, "ts": ts, **meta}, f)
     return gid
+
+
+def _gallery_save(images, prompt, meta) -> None:
+    """Persist each generated image + its metadata to the on-disk gallery (best-effort)."""
+    base = int(time.time() * 1000)
+    for i, im in enumerate(images):
+        _gallery_write(im, f"{base}-{int(meta.get('seed', 0))}-{i}", base, prompt, meta)
+
+
+def _gallery_save_one(im, prompt, meta) -> str:
+    """Persist a single image and return its id (used by upscale)."""
+    ts = int(time.time() * 1000)
+    return _gallery_write(im, f"{ts}-{int(meta.get('seed', 0))}-0", ts, prompt, meta)
 
 
 def _gallery_list() -> list:
@@ -448,7 +448,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 def _job():
                     if up.will_load():
-                        safe_emit({"type": "status", "message": "Loading the SeedVR2 upscaler… (first use downloads it)"})
+                        safe_emit({"type": "status", "message": "Loading the SeedVR2 upscaler… (first use downloads ~7 GB)"})
                     safe_emit({"type": "status", "message": f"Upscaling {scale}×…"})
                     return _apply_safety([up.upscale(src_path, scale)], req.get("safety", True))
 
