@@ -381,7 +381,7 @@ function allBuilds(){
   const cat={};(CATALOG.backends||[]).forEach(b=>b.entries.forEach(e=>cat[b.id+":"+e.variant]=e));
   const out=[];
   BACKENDS.forEach(b=>b.variants.forEach(v=>{const c=cat[b.id+":"+v.id];
-    out.push({backend:b.id,blabel:b.label,variant:v.id,label:v.label,
+    out.push({backend:b.id,blabel:b.label,variant:v.id,label:v.label,min_ram:v.min_ram||b.min_ram_gib||0,
       installed:c?!!c.installed:true,downloadable:!!c,size_gb:c?c.size_gb:null,note:c?c.note:(b.info||null)});}));
   return out;
 }
@@ -423,6 +423,11 @@ function renderModelGroup(){
   wrap.appendChild(btn);wrap.appendChild(pop);modelGroup.appendChild(wrap);
   if(SYS.recommended&&SYS.recommended_label&&SYS.ram_gib)
     modelGroup.appendChild(el("div","mphint","★ <b>"+SYS.recommended_label+"</b> — recommended for your "+SYS.ram_gib+" GB Mac"));
+  if(cur&&cur.min_ram&&SYS.ram_gib&&cur.min_ram>SYS.ram_gib){
+    const w=el("div","rwarn show");
+    w.textContent="⚠ "+cur.blabel+" needs ~"+cur.min_ram+" GB RAM — this Mac has "+SYS.ram_gib+" GB. It may run out of memory.";
+    modelGroup.appendChild(w);
+  }
 }
 
 function popRow(b){
@@ -539,7 +544,20 @@ async function generate(){
   if(busy)return;const p=prompt.value.trim();errBox.classList.remove("show");
   if(!p){showErr("Enter a prompt.");return;}
   if(!current){showErr("No model selected.");return;}
+  const cur=buildOf(current);
+  // Gate on memory: if the chosen build's RAM floor exceeds this Mac, confirm before a big download → OOM.
+  if(cur&&cur.min_ram&&SYS.ram_gib&&cur.min_ram>SYS.ram_gib){
+    showModal(cur.blabel+" may not fit this Mac",
+      cur.blabel+" ("+cur.label+") wants about "+cur.min_ram+" GB of memory; this Mac has "+SYS.ram_gib+" GB. "+
+      "It downloads several GB and will likely run out of memory. Generate anyway?",
+      ()=>runGenerate(p,true));
+    return;
+  }
+  runGenerate(p,false);
+}
+async function runGenerate(p,allowLowRam){
   const body={prompt:p,model:current,safety:safetyOn,params:{...PV}};
+  if(allowLowRam)body.allow_low_ram=true;
   setBusy(true);empty.style.display="none";
   progress.classList.add("show");barfill.style.width="0%";pstep.textContent="Loading model…";ptime.textContent="";
   t0=Date.now();clearInterval(timer);timer=setInterval(()=>ptime.textContent=fmt((Date.now()-t0)/1000)+"s",100);

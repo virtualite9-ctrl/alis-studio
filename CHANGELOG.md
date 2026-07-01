@@ -8,6 +8,30 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.7.1] — 2026-07-02
+
+### Added
+- **Qwen-Image Edit** — instruction-based image editing (Tongyi, Apache-2.0): attach an image and
+  describe the change ("make the hat red", understands Korean and other languages). Unlike
+  strength-based img2img this follows an edit instruction; the output keeps the input's aspect ratio,
+  normalized to ~1 MP (≈1024²). Offered in **8-bit** (needs ~64 GB RAM) and **bf16** (~96 GB);
+  downloads ~54 GB on first use. The model picker now **warns** — and the app refuses with a confirm
+  override — when a chosen build's RAM floor exceeds this Mac's memory (measured peaks: 8-bit ~39 GB,
+  bf16 ~58 GB).
+  - *4-bit is deliberately not offered* — mflux's 4-bit quantization of this model decodes to grainy
+    noise regardless of step count (reproduced with the stock mflux CLI; same upstream issue that
+    removed Qwen-Image 4-bit in #9).
+
+### Changed
+- The generation result now reports the **actual output size** (edit models keep the input's size;
+  others may round to a multiple of 16) instead of the requested size.
+- **Krea 2 Turbo** 2K sampling now pins the timestep shift to `mu = 1.15` at 2048² (matches Krea's
+  own 2K recipe) instead of extrapolating past it (`krea2-alis-mlx` 0.1.2).
+
+### Fixed
+- Upscale status now hints at the first-use download size, and the gallery-save path was
+  de-duplicated (single `_gallery_write` primitive).
+
 ## [0.7.0] — 2026-07-01
 
 ### Added

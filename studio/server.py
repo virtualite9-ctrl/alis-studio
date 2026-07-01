@@ -149,6 +149,8 @@ def _ram_gib() -> float:
 
 # Quality-preference order for the "recommended for your Mac" hint: flagship first. The pick is the
 # first of these that's installed AND whose RAM floor (Backend.min_ram_gib) this machine clears.
+# Text-to-image models only — "qwen-image-edit" is intentionally omitted: it needs an input image,
+# so it's never a sensible default pick even on a large Mac.
 _RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "flux-dev", "z-image-turbo", "flux-schnell"]
 
 
@@ -205,26 +207,26 @@ def _safe_id(gid: str) -> bool:
     return bool(gid) and all(c.isalnum() or c in "-_" for c in gid)
 
 
-def _gallery_save(images, prompt, meta) -> None:
-    """Persist each generated image + its metadata to the on-disk gallery (best-effort)."""
+def _gallery_write(im, gid, ts, prompt, meta) -> str:
+    """The one writer: persist a single image + its metadata json to the gallery. Returns the id."""
     d = _gallery_dir()
-    base = int(time.time() * 1000)
-    for i, im in enumerate(images):
-        gid = f"{base}-{int(meta.get('seed', 0))}-{i}"
-        im.save(os.path.join(d, gid + ".png"))
-        with open(os.path.join(d, gid + ".json"), "w") as f:
-            json.dump({"id": gid, "prompt": prompt, "ts": base, **meta}, f)
-
-
-def _gallery_save_one(im, prompt, meta) -> str:
-    """Persist a single image + metadata to the gallery and return its id (used by upscale)."""
-    d = _gallery_dir()
-    ts = int(time.time() * 1000)
-    gid = f"{ts}-{int(meta.get('seed', 0))}-0"
     im.save(os.path.join(d, gid + ".png"))
     with open(os.path.join(d, gid + ".json"), "w") as f:
         json.dump({"id": gid, "prompt": prompt, "ts": ts, **meta}, f)
     return gid
+
+
+def _gallery_save(images, prompt, meta) -> None:
+    """Persist each generated image + its metadata to the on-disk gallery (best-effort)."""
+    base = int(time.time() * 1000)
+    for i, im in enumerate(images):
+        _gallery_write(im, f"{base}-{int(meta.get('seed', 0))}-{i}", base, prompt, meta)
+
+
+def _gallery_save_one(im, prompt, meta) -> str:
+    """Persist a single image and return its id (used by upscale)."""
+    ts = int(time.time() * 1000)
+    return _gallery_write(im, f"{ts}-{int(meta.get('seed', 0))}-0", ts, prompt, meta)
 
 
 def _gallery_list() -> list:
@@ -363,6 +365,18 @@ class Handler(BaseHTTPRequestHandler):
 
             try:
                 backend, variant = _registry().resolve(req.get("model", ""))
+                # Hard RAM gate: refuse a build whose memory floor this Mac can't meet, BEFORE mflux
+                # fetches gigabytes of weights only to OOM at load. The UI shows a confirm dialog and
+                # sends allow_low_ram=true to override; power users can set ALIS_ALLOW_LOW_RAM. A failed
+                # RAM probe (ram==0) is treated as "unknown" and allowed rather than blocking blindly.
+                ram = _ram_gib()
+                floor = backend.min_ram_for(variant)
+                allow_low = req.get("allow_low_ram") or os.environ.get("ALIS_ALLOW_LOW_RAM")
+                if ram and floor and floor > ram and not allow_low:
+                    raise ValueError(
+                        f"{backend.label} needs about {floor} GB of memory, but this Mac has "
+                        f"{ram:.0f} GB. It would download several GB and then run out of memory. "
+                        f"Run it on a Mac with more unified memory.")
                 params = dict(req.get("params") or {})
                 w = int(params.get("width") or params.get("size") or 1024)
                 h = int(params.get("height") or params.get("size") or 1024)
@@ -381,7 +395,10 @@ class Handler(BaseHTTPRequestHandler):
                     return _apply_safety(out, req.get("safety", True))
 
                 imgs, flagged = _gpu(_job)
-                meta = {"model": backend.label, "width": w, "height": h,
+                # report the ACTUAL output size — edit models normalize to ~1 MP and others may round
+                # to a multiple of 16, so the produced image can differ from the requested w/h
+                ow, oh = (imgs[0].width, imgs[0].height) if imgs else (w, h)
+                meta = {"model": backend.label, "width": ow, "height": oh,
                         "steps": int(params.get("steps", 8)), "seed": int(params.get("seed", 0)),
                         "seconds": round(time.time() - t0, 1)}
                 try:
@@ -448,7 +465,7 @@ class Handler(BaseHTTPRequestHandler):
             try:
                 def _job():
                     if up.will_load():
-                        safe_emit({"type": "status", "message": "Loading the SeedVR2 upscaler… (first use downloads it)"})
+                        safe_emit({"type": "status", "message": "Loading the SeedVR2 upscaler… (first use downloads ~7 GB)"})
                     safe_emit({"type": "status", "message": f"Upscaling {scale}×…"})
                     return _apply_safety([up.upscale(src_path, scale)], req.get("safety", True))
 
