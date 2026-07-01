@@ -38,7 +38,17 @@ class Backend:
 
     def meta(self) -> dict:
         return {"id": self.id, "label": self.label, "info": self.info,
-                "prompt_note": self.prompt_note, "variants": self.variants, "params": self.params}
+                "prompt_note": self.prompt_note, "variants": self.variants, "params": self.params,
+                "min_ram_gib": self.min_ram_gib}
+
+    def min_ram_for(self, variant: str) -> int:
+        """RAM floor (GiB) for a specific build. Defaults to the backend-wide min_ram_gib, but a
+        variant may override it (e.g. a bf16 build needs far more than the 8-bit one) by carrying a
+        "min_ram" key in its `variants` entry. Drives the UI warning and the server-side gate."""
+        for v in self.variants:
+            if v.get("id") == variant and v.get("min_ram"):
+                return int(v["min_ram"])
+        return self.min_ram_gib
 
     def generate(self, *, prompt: str, variant: str, params: dict, step_callback):
         """Return a list of PIL.Image. `params` carries the resolved settings (width, height,

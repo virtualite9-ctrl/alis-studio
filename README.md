@@ -84,6 +84,11 @@ too large to ship inside a DMG.
   Qwen-Image 1536², Z-Image / FLUX 1280². The picker warns when a size may not fit your Mac's memory.
 - **Image-to-image** — the mflux models (Z-Image / Qwen / FLUX) take an optional **Input image** +
   **Strength**; attach a picture and transform it with your prompt. (Krea 2 Turbo is text-to-image only.)
+- **Instruction editing** — **Qwen-Image Edit** (Apache-2.0) follows an edit instruction ("make the
+  hat red", understands Korean); the output keeps the input's aspect ratio, normalized to ~1 MP
+  (≈1024²). Offered in 8-bit / bf16; it's a large model (~54 GB download, **≥ 64 GB** for 8-bit,
+  **≥ 96 GB** for bf16), so the picker warns — and the app refuses with a confirm override — when your
+  Mac is under a build's memory floor. 4-bit is intentionally omitted: mflux quantizes it to noise.
 - **Upscale** — open any gallery image and **Upscale 2× / 3×** with [SeedVR2](https://github.com/ml-explore)
   diffusion super-resolution (3B, Apache-2.0). Model downloads on first use; available on Macs with ≥ 24 GB.
 - **Gallery** — every generation is saved; click a thumbnail (or its prompt) for a lightbox with the
@@ -106,6 +111,7 @@ downloads inline, and the previous build is freed when you switch (two big model
 | **Krea 2 Turbo** | 8-bit (14.2 GB) · mixed-4/8 (9.8 GB). 8-step Turbo. Wants ≥ 24 GB RAM. | managed in-app (resumable, with progress) |
 | **Z-Image Turbo** | 4-bit (~6 GB) · 8-bit · bf16. 9-step Turbo, Apache-2.0. **Runs on 16 GB**; multilingual (Qwen3 encoder). | auto on first use via mflux |
 | **Qwen-Image** | 8-bit, bf16. Apache-2.0, open. (No 4-bit — its ~20B transformer gets grainy below 8-bit.) | auto on first use via mflux (~40 GB) |
+| **Qwen-Image Edit** | 8-bit (needs ≥ 64 GB) · bf16 (≥ 96 GB). Apache-2.0 instruction editing. (No 4-bit — mflux quantizes it to noise.) | auto on first use via mflux (~54 GB) |
 | **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |
 | **FLUX.1 dev** | 8/4-bit, bf16. Non-commercial, **gated**. | auto on first use via mflux (~24 GB) |
 
