@@ -1,7 +1,8 @@
 # Alis Studio
 
 A local, **model-agnostic** image-generation studio for **Apple silicon** — a clean, native-feeling
-web UI that runs text-to-image models entirely on your Mac with [MLX](https://github.com/ml-explore/mlx).
+web UI that runs image models entirely on your Mac with [MLX](https://github.com/ml-explore/mlx):
+**text-to-image**, **image-to-image** (attach an image and transform it), and **upscaling** (SeedVR2).
 No cloud, no accounts, your images never leave your machine.
 
 Ships with **[Krea 2 Turbo](https://github.com/avlp12/krea2_alis_mlx)** (pure-MLX) and
@@ -79,6 +80,14 @@ too large to ship inside a DMG.
 - **Low-memory rendering** — on **≤ 24 GB** Macs, large (≥ 1024²) renders use mflux's VAE tiling so
   they fit (Z-Image 1024² peak ~12.9 → ~8.5 GB, no visible quality change); bigger Macs and smaller
   renders keep the exact decode. Override with `ALIS_VAE_TILING=1`/`0`.
+- **Bigger images** — per-model max resolution: Krea 2 Turbo up to **2048²** (a native 1K–2K model),
+  Qwen-Image 1536², Z-Image / FLUX 1280². The picker warns when a size may not fit your Mac's memory.
+- **Image-to-image** — the mflux models (Z-Image / Qwen / FLUX) take an optional **Input image** +
+  **Strength**; attach a picture and transform it with your prompt. (Krea 2 Turbo is text-to-image only.)
+- **Upscale** — open any gallery image and **Upscale 2× / 3×** with [SeedVR2](https://github.com/ml-explore)
+  diffusion super-resolution (3B, Apache-2.0). Model downloads on first use; available on Macs with ≥ 24 GB.
+- **Gallery** — every generation is saved; click a thumbnail (or its prompt) for a lightbox with the
+  full **editable** prompt, plus Use / Copy / Download / Delete.
 - **NSFW safety filter** runs by default (pure-MLX, no PyTorch); toggle it with the shield icon.
 - Bind to your LAN with `ALIS_HOST=0.0.0.0 python3 app.py` (only on networks you trust); change
   the port with `ALIS_PORT=7861`.

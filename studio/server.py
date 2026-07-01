@@ -89,23 +89,28 @@ def _apply_safety(images, enabled):
         return list(images), 0
 
 
-def _stash_input_image(params):
-    """For img2img: if the request carries an uploaded image (data URI in params['init_image']),
-    decode it to a temp PNG and set params['image_path'] (what mflux's generate_image expects).
-    Returns the temp path to clean up later, or None for plain txt2img."""
-    data_uri = params.pop("init_image", None)
+def _datauri_to_temp(data_uri, prefix):
+    """Decode a base64 data: URI to a temp PNG file and return its path (or None). Caller removes it."""
     if not isinstance(data_uri, str) or not data_uri.startswith("data:"):
         return None
     try:
         import tempfile
         raw = base64.b64decode(data_uri.split(",", 1)[1])
-        fd, path = tempfile.mkstemp(prefix="alis_in_", suffix=".png")
+        fd, path = tempfile.mkstemp(prefix=prefix, suffix=".png")
         with os.fdopen(fd, "wb") as f:
             f.write(raw)
-        params["image_path"] = path
         return path
     except Exception:
         return None
+
+
+def _stash_input_image(params):
+    """For img2img: decode an uploaded image (data URI in params['init_image']) to a temp PNG and set
+    params['image_path'] (what mflux's generate_image expects). Returns the temp path, or None."""
+    path = _datauri_to_temp(params.pop("init_image", None), "alis_in_")
+    if path:
+        params["image_path"] = path
+    return path
 
 
 def _disk_gb() -> float:
@@ -172,7 +177,8 @@ def _system() -> dict:
             "enhance_available": prompt_rewrite.is_available(),
             "enhance_model": prompt_rewrite.MODEL,
             "recommended": rec_id, "recommended_label": rec_label,
-            "upscale_available": Upscaler.is_available()}
+            # gate upscale on RAM too: SeedVR2-3B + a 2–4 MP target on top of a cached model needs room
+            "upscale_available": Upscaler.is_available() and ram >= Upscaler.min_ram_gib}
 
 
 def _catalog() -> dict:
@@ -304,6 +310,9 @@ class Handler(BaseHTTPRequestHandler):
             return
         try:
             n = int(self.headers.get("Content-Length", 0))
+            if n > 128 * 1024 * 1024:   # cap the body (uploaded images are base64) — don't let a huge POST OOM us
+                self._send(413, "text/plain", b"request too large")
+                return
             req = json.loads(self.rfile.read(n) or b"{}")
         except (ValueError, json.JSONDecodeError):
             self._send(400, "text/plain", b"bad request")
@@ -427,18 +436,8 @@ class Handler(BaseHTTPRequestHandler):
                 except Exception:
                     pass
         if src_path is None:
-            data_uri = req.get("image")
-            if isinstance(data_uri, str) and data_uri.startswith("data:"):
-                try:
-                    import base64
-                    import tempfile
-                    raw = base64.b64decode(data_uri.split(",", 1)[1])
-                    fd, src_tmp = tempfile.mkstemp(prefix="alis_up_", suffix=".png")
-                    with os.fdopen(fd, "wb") as f:
-                        f.write(raw)
-                    src_path = src_tmp
-                except Exception:
-                    src_path = None
+            src_tmp = _datauri_to_temp(req.get("image"), "alis_up_")
+            src_path = src_tmp
         if not src_path:
             safe_emit({"type": "error", "message": "No image to upscale."})
             return
