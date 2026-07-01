@@ -8,6 +8,25 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.7.0] — 2026-07-01
+
+### Added
+- **Image-to-image** — attach an image and transform it with a prompt. Z-Image Turbo, Qwen-Image,
+  and FLUX get a drag-and-drop **Input image** control plus a **Strength** slider (Krea 2 Turbo
+  stays text-to-image). The uploaded image never leaves your Mac; the NSFW filter still runs on the
+  output.
+- **Upscale (2× / 3×)** — a diffusion super-resolution step powered by **SeedVR2** (3B, Apache-2.0).
+  Open any gallery image and upscale it to a crisp 2K–4K; the result is saved back to the gallery.
+  Downloads on first use; auto-hidden on Macs under 24 GB.
+- **Gallery lightbox** — click an image (or its prompt) to open a full view with the **full,
+  editable prompt** and icon actions: Use (send the edited prompt to Generate), Copy, Download,
+  Delete. Cards also get a quick Copy-prompt button.
+
+### Changed
+- **Larger resolutions per model** — Krea 2 Turbo up to **2048²** (it's a native 1K–2K model),
+  Qwen-Image up to 1536², Z-Image / FLUX up to 1280². On a low-memory Mac the resolution control
+  now **warns** when a chosen size may not fit (≤16 GB → above 1024², ≤24 GB → above 1536²).
+
 ## [0.6.3] — 2026-06-29
 
 ### Fixed

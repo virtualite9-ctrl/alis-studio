@@ -64,6 +64,12 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .seedrow{display:flex;gap:6px}.seedrow input{flex:1}
 .sq{width:32px;height:32px;border:0.5px solid var(--border);border-radius:8px;background:var(--surface);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center;flex:none}.sq:hover{border-color:var(--border-strong)}.sq svg{width:16px;height:16px}
 .hint{font-size:11px;color:var(--muted);margin-top:5px;line-height:1.4}
+.rwarn{font-size:11px;color:var(--clay);margin-top:6px;line-height:1.4;display:none}.rwarn.show{display:block}
+.imgdrop{border:1.5px dashed var(--muted);border-radius:10px;min-height:92px;display:flex;align-items:center;justify-content:center;cursor:pointer;overflow:hidden;position:relative;background:var(--surface-1)}
+.imgdrop.over{border-color:var(--clay);background:var(--surface-2)}
+.idph{font-size:12px;color:var(--muted);padding:16px;text-align:center}
+.ithumb{max-width:100%;max-height:220px;display:block}
+.irm{position:absolute;top:6px;right:6px;width:22px;height:22px;border:none;border-radius:50%;background:rgba(0,0,0,.55);color:#fff;font-size:15px;line-height:1;cursor:pointer;display:flex;align-items:center;justify-content:center}
 .phint{font-size:12px;color:var(--muted);margin:7px 2px 0;line-height:1.4}.phint:empty{display:none}
 .enhbtn{height:34px;padding:0 12px;border:0.5px solid var(--border-strong);border-radius:17px;background:var(--surface);color:var(--text);font-size:13px;display:none;align-items:center;gap:6px}
 .enhbtn.show{display:inline-flex}.enhbtn:hover{background:var(--surface-1)}.enhbtn:disabled{opacity:.55}.enhbtn svg{width:15px;height:15px}
@@ -88,10 +94,34 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .gcard{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-2)}
 .gcard img{display:block;width:100%;aspect-ratio:1;object-fit:cover;background:var(--surface-1)}
 .gcap{padding:9px 11px}
-.gcap .gp{font-size:12px;color:var(--text-2);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:33px}
+.gcap .gp{font-size:12px;color:var(--text-2);line-height:1.4;display:-webkit-box;-webkit-line-clamp:2;-webkit-box-orient:vertical;overflow:hidden;min-height:33px;cursor:pointer}.gcap .gp:hover{color:var(--text)}
 .gcap .gm{font-size:11px;color:var(--muted);font-family:var(--mono);margin-top:6px;display:flex;align-items:center;gap:9px}
 .gcap .gm .sp{flex:1;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .gact{color:var(--text-2);cursor:pointer;display:inline-flex;flex:none}.gact:hover{color:var(--text)}.gact svg{width:15px;height:15px}
+.gcard img{cursor:pointer}
+.lightbox{position:fixed;inset:0;background:rgba(20,18,16,.72);display:none;align-items:center;justify-content:center;z-index:60;padding:24px}
+.lightbox.show{display:flex}
+.lbox{position:relative;display:flex;gap:14px;padding:14px;max-width:1100px;max-height:88vh;background:var(--surface-2);border-radius:16px;overflow:hidden;box-shadow:var(--shadow)}
+.lbox>img{border-radius:12px;max-width:min(64vw,680px);max-height:calc(88vh - 28px);object-fit:contain;background:var(--surface-1);display:block}
+.lbside{width:320px;padding:4px 4px 4px 0;display:flex;flex-direction:column;gap:10px;min-height:0}
+.lblab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.lbprompt{font-size:13px;color:var(--text);line-height:1.5;flex:1;min-height:120px;resize:none;border:1px solid var(--muted);border-radius:9px;padding:10px 11px;background:var(--surface-1);font-family:inherit;outline:none}
+.lbprompt:focus{border-color:var(--clay)}
+.lbmeta{font-size:11px;color:var(--muted);font-family:var(--mono)}
+.lbacts{display:flex;gap:8px}
+.iconbtn{width:34px;height:34px;border:1px solid var(--muted);border-radius:9px;background:transparent;color:var(--text-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
+.iconbtn:hover{color:var(--text);border-color:var(--text-2);background:var(--surface-1)}
+.iconbtn svg{width:17px;height:17px}
+.iconbtn.primary{background:var(--clay);color:var(--on-clay);border-color:var(--clay)}
+.iconbtn.primary:hover{background:var(--clay-hover);color:var(--on-clay)}
+.iconbtn.danger:hover{color:#fff;background:#c0493b;border-color:#c0493b}
+.lbacts .grow{flex:1}
+.lbup{display:flex;align-items:center;gap:8px;flex-wrap:wrap}
+.pill{padding:5px 12px;border:1px solid var(--muted);border-radius:16px;background:transparent;color:var(--text-2);cursor:pointer;font-size:12px}
+.pill:hover{color:var(--text);border-color:var(--text-2)}.pill:disabled{opacity:.5;cursor:default}
+.lbupst{font-size:11px;color:var(--muted);flex:1;min-width:80px}
+.lbx{position:absolute;top:8px;right:8px;width:28px;height:28px;border:none;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:18px;line-height:1;cursor:pointer;z-index:1;display:flex;align-items:center;justify-content:center}
+@media(max-width:760px){.lbox{flex-direction:column;max-height:92vh}.lbox>img{max-width:100%;max-height:50vh}.lbside{width:auto;padding:0;overflow-y:auto}}
 .gempty{text-align:center;color:var(--muted);font-size:14px;padding:50px 0}
 textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-height:1.4}
 .disabled{opacity:.5;pointer-events:none}
@@ -176,6 +206,7 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
 </div>
 
 <div class="modal" id="modal"><div class="mbox"><h3 id="mtitle"></h3><p id="mtext"></p><div class="mbtns"><button class="mbtn" id="mcancel">Cancel</button><button class="mbtn primary" id="mok">Enable</button></div></div></div>
+<div class="lightbox" id="lightbox"><div class="lbox"><button class="lbx" id="lbClose" aria-label="Close">×</button><img id="lbImg" alt=""><div class="lbside"><label class="lblab" for="lbPrompt">Prompt · edit &amp; reuse</label><textarea class="lbprompt" id="lbPrompt" spellcheck="false"></textarea><div class="lbmeta" id="lbMeta"></div><div class="lbup" id="lbUpRow" style="display:none"><span class="lblab">Upscale</span><button class="pill" data-s="2">2×</button><button class="pill" data-s="3">3×</button><span class="lbupst" id="lbUpStatus"></span></div><div class="lbacts"><button class="iconbtn primary" id="lbUse" title="Use this prompt — send to the box &amp; generate" aria-label="Use prompt"></button><button class="iconbtn" id="lbCopy" title="Copy prompt" aria-label="Copy prompt"></button><button class="iconbtn" id="lbDl" title="Download image" aria-label="Download"></button><span class="grow"></span><button class="iconbtn danger" id="lbDel" title="Delete" aria-label="Delete"></button></div></div></div></div>
 
 <script>
 const $=s=>document.querySelector(s);
@@ -195,6 +226,7 @@ const SVG_STOP='<svg viewBox="0 0 24 24" fill="currentColor"><rect x="6" y="6" w
 const SVG_GRID='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>';
 const SVG_BACK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z" fill="currentColor" stroke="none"/></svg>';
 const SVG_REUSE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
+const SVG_COPY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
 const fmt=n=>(Math.round(n*10)/10).toFixed(1);
 const showErr=m=>{errBox.textContent=m;errBox.classList.add("show");};
 const m16=(x,min,max)=>Math.max(min,Math.min(max,Math.round(x/16)*16));
@@ -224,18 +256,65 @@ function renderGallery(items){
   items.forEach(it=>{
     const card=el("div","gcard");
     const meta=(it.model||"")+" · "+it.width+"×"+it.height+" · seed "+it.seed;
-    card.innerHTML='<img loading="lazy" src="/api/gallery/'+it.id+'.png" alt="">'
+    card.innerHTML='<img loading="lazy" src="/api/gallery/'+it.id+'.png" alt="" title="Click to enlarge">'
       +'<div class="gcap"><div class="gp">'+(it.prompt||"").replace(/</g,"&lt;")+'</div>'
       +'<div class="gm"><span class="sp" title="'+meta+'">'+meta+'</span>'
       +'<span class="gact" data-a="use" title="Use this prompt">'+SVG_REUSE+'</span>'
+      +'<span class="gact" data-a="copy" title="Copy prompt">'+SVG_COPY+'</span>'
       +'<a class="gact" data-a="dl" title="Download">'+SVG_DL+'</a>'
       +'<span class="gact" data-a="del" title="Delete">'+SVG_TRASH+'</span></div></div>';
-    card.querySelector('[data-a="use"]').onclick=()=>{prompt.value=it.prompt||"";prompt.dispatchEvent(new Event("input"));toggleGallery(false);};
-    card.querySelector('[data-a="dl"]').onclick=()=>{const a=document.createElement("a");a.href="/api/gallery/"+it.id+".png";a.download="alis_"+it.seed+".png";a.click();};
+    card.querySelector("img").onclick=()=>openLightbox(it);
+    card.querySelector(".gp").onclick=()=>openLightbox(it);   // clicking the prompt text opens it too
+    card.querySelector('[data-a="use"]').onclick=()=>usePrompt(it.prompt);
+    card.querySelector('[data-a="copy"]').onclick=e=>{e.stopPropagation();copyText(it.prompt||"",e.currentTarget);};
+    card.querySelector('[data-a="dl"]').onclick=()=>dlGalleryImg(it);
     card.querySelector('[data-a="del"]').onclick=()=>delGallery(it.id);
     grid.appendChild(card);
   });
 }
+function usePrompt(p){prompt.value=p||"";prompt.dispatchEvent(new Event("input"));$("#lightbox").classList.remove("show");toggleGallery(false);prompt.focus();}
+function dlGalleryImg(it){const a=document.createElement("a");a.href="/api/gallery/"+it.id+".png";a.download="alis_"+it.seed+".png";a.click();}
+function copyText(t,btn){   // swap the icon to a check briefly, so icon buttons keep their glyph
+  const flash=()=>{if(btn){const o=btn.innerHTML;btn.innerHTML=SVG_CHECK;setTimeout(()=>{btn.innerHTML=o;},1100);}};
+  const fb=()=>{const ta=document.createElement("textarea");ta.value=t;ta.style.position="fixed";ta.style.opacity="0";document.body.appendChild(ta);ta.focus();ta.select();try{document.execCommand("copy");}catch(e){}document.body.removeChild(ta);flash();};
+  if(navigator.clipboard&&navigator.clipboard.writeText){navigator.clipboard.writeText(t).then(flash).catch(fb);}else fb();
+}
+function openLightbox(it){
+  $("#lbImg").src="/api/gallery/"+it.id+".png";
+  $("#lbPrompt").value=it.prompt||"";                       // editable — Use/Copy act on the edited text
+  $("#lbMeta").textContent=(it.model||"")+" · "+it.width+"×"+it.height+(it.steps?(" · "+it.steps+" steps"):"")+" · seed "+it.seed;
+  const lb=$("#lightbox");lb.classList.add("show");
+  $("#lbUse").onclick=()=>usePrompt($("#lbPrompt").value);
+  $("#lbCopy").onclick=e=>copyText($("#lbPrompt").value,e.currentTarget);
+  $("#lbDl").onclick=()=>dlGalleryImg(it);
+  $("#lbDel").onclick=()=>{lb.classList.remove("show");delGallery(it.id);};
+  const upRow=$("#lbUpRow"),upSt=$("#lbUpStatus");upSt.textContent="";
+  if(SYS.upscale_available){upRow.style.display="flex";
+    upRow.querySelectorAll(".pill").forEach(btn=>btn.onclick=()=>doUpscale({id:it.id},+btn.getAttribute("data-s"),it.prompt||""));
+  }else upRow.style.display="none";
+}
+async function doUpscale(payload,scale,origPrompt){
+  const st=$("#lbUpStatus"),pills=[...$("#lbUpRow").querySelectorAll(".pill")];
+  pills.forEach(b=>b.disabled=true);st.textContent="Starting…";errBox.classList.remove("show");
+  try{
+    const res=await fetch("/api/upscale",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({...payload,scale,safety:safetyOn})});
+    if(!res.ok||!res.body)throw new Error("server "+res.status);
+    const reader=res.body.getReader(),dec=new TextDecoder();let buf="";
+    while(true){const{value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let nl;
+      while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(!line.trim())continue;const ev=JSON.parse(line);
+        if(ev.type==="status")st.textContent=ev.message;
+        else if(ev.type==="error"){st.textContent="";showErr(ev.message);}
+        else if(ev.type==="done"){loadGallery();if(ev.id)openLightbox({id:ev.id,prompt:origPrompt,width:ev.meta.width,height:ev.meta.height,seed:0,steps:0,model:ev.meta.model});}
+      }}
+  }catch(e){st.textContent="";showErr("Upscale failed: "+e.message);}
+  finally{pills.forEach(b=>b.disabled=false);}
+}
+(function(){const lb=$("#lightbox");if(lb){
+  $("#lbUse").innerHTML=SVG_REUSE;$("#lbCopy").innerHTML=SVG_COPY;$("#lbDl").innerHTML=SVG_DL;$("#lbDel").innerHTML=SVG_TRASH;
+  $("#lbClose").onclick=()=>lb.classList.remove("show");
+  lb.onclick=e=>{if(e.target===lb)lb.classList.remove("show");};
+  document.addEventListener("keydown",e=>{if(e.key==="Escape")lb.classList.remove("show");});
+}})();
 async function delGallery(id){
   try{ await fetch("/api/gallery/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); }catch(e){}
   loadGallery();
@@ -391,16 +470,40 @@ function renderParams(b){
   for(const[g,ps]of Object.entries(groups)){paramGroups.appendChild(el("div","sgrp",g));ps.forEach(p=>paramGroups.appendChild(control(p)));}
 }
 
+// memory-aware high-res warning: what pixel budget is comfortable for this Mac's RAM
+function resWarn(px){
+  const ram=SYS.ram_gib||0; if(!ram) return "";
+  const cap = ram<=16 ? 1024*1024 : ram<=24 ? 1536*1536 : ram<=32 ? 2048*2048 : Infinity;
+  if(px>cap) return "⚠️ Large for a "+ram+" GB Mac — this may be slow or run out of memory. A smaller size is safer.";
+  return "";
+}
 function control(p){
   const c=el("div","ctl");
   if(p.type==="resolution"){
     PV.width=p.default_size;PV.height=p.default_size;let base=p.default_size,asp=p.default_aspect;
-    const apply=()=>{const[a,bb]=asp.split(":").map(Number);let w,h;if(a>=bb){w=base;h=base*bb/a;}else{h=base;w=base*a/bb;}PV.width=m16(w,p.min,p.max);PV.height=m16(h,p.min,p.max);dim.textContent=PV.width+" × "+PV.height;};
+    const apply=()=>{const[a,bb]=asp.split(":").map(Number);let w,h;if(a>=bb){w=base;h=base*bb/a;}else{h=base;w=base*a/bb;}PV.width=m16(w,p.min,p.max);PV.height=m16(h,p.min,p.max);dim.textContent=PV.width+" × "+PV.height;const wm=resWarn(PV.width*PV.height);warn.textContent=wm;warn.classList.toggle("show",!!wm);};
     c.appendChild(el("div","lab","<span>"+p.label+"</span><b id='dimout'></b>"));
     const sel=el("select","fld");p.sizes.forEach(s=>{const o=el("option",null,s+" px");o.value=s;if(s===base)o.selected=true;sel.appendChild(o);});
     sel.onchange=()=>{base=+sel.value;apply();};c.appendChild(sel);
     const aw=el("div","aspects");p.aspects.forEach(a=>{const t=el("div","ap"+(a===asp?" on":""),a);t.onclick=()=>{asp=a;[...aw.children].forEach(x=>x.classList.remove("on"));t.classList.add("on");apply();};aw.appendChild(t);});
-    c.appendChild(aw);const dim=c.querySelector("#dimout");apply();return c;
+    c.appendChild(aw);const warn=el("div","rwarn");c.appendChild(warn);const dim=c.querySelector("#dimout");apply();return c;
+  }
+  if(p.type==="image"){
+    PV[p.key]=null;
+    c.appendChild(el("div","lab","<span>"+p.label+"</span>"));
+    const drop=el("div","imgdrop");
+    const inp=document.createElement("input");inp.type="file";inp.accept="image/*";inp.style.display="none";
+    const set=(uri)=>{PV[p.key]=uri||null;
+      if(uri){drop.innerHTML="<img class='ithumb' alt='input'><button class='irm' aria-label='Remove'>×</button>";drop.querySelector(".ithumb").src=uri;drop.querySelector(".irm").onclick=e=>{e.stopPropagation();set(null);};}
+      else{drop.innerHTML="<span class='idph'>Drop an image or click to browse</span>";}};
+    const read=f=>{if(f&&f.type&&f.type.indexOf("image/")===0){const fr=new FileReader();fr.onload=()=>set(fr.result);fr.readAsDataURL(f);}};
+    set(null);
+    drop.onclick=()=>inp.click();
+    inp.onchange=()=>read(inp.files[0]);
+    drop.ondragover=e=>{e.preventDefault();drop.classList.add("over");};
+    drop.ondragleave=()=>drop.classList.remove("over");
+    drop.ondrop=e=>{e.preventDefault();drop.classList.remove("over");read(e.dataTransfer.files[0]);};
+    c.appendChild(drop);c.appendChild(inp);if(p.hint)c.appendChild(el("div","hint",p.hint));return c;
   }
   if(p.type==="int"||p.type==="float"){
     const step=p.step||(p.type==="float"?0.1:1);PV[p.key]=p.default;
