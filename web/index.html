@@ -122,6 +122,28 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .lbupst{font-size:11px;color:var(--muted);flex:1;min-width:80px}
 .lbx{position:absolute;top:8px;right:8px;width:28px;height:28px;border:none;border-radius:50%;background:rgba(0,0,0,.5);color:#fff;font-size:18px;line-height:1;cursor:pointer;z-index:1;display:flex;align-items:center;justify-content:center}
 @media(max-width:760px){.lbox{flex-direction:column;max-height:92vh}.lbox>img{max-width:100%;max-height:50vh}.lbside{width:auto;padding:0;overflow-y:auto}}
+/* --- v0.7.2 canvas editor --- */
+.editor{position:fixed;inset:0;background:rgba(20,18,16,.82);display:none;align-items:center;justify-content:center;z-index:70;padding:22px}
+.editor.show{display:flex}
+.edwrap{position:relative;display:flex;gap:14px;padding:14px;max-width:1180px;max-height:90vh;background:var(--surface-2);border-radius:16px;box-shadow:var(--shadow)}
+.edstage{position:relative;display:flex;align-items:center;justify-content:center;background:var(--surface-1);border-radius:12px;overflow:hidden;min-width:0}
+.edstage canvas{max-width:min(72vw,820px);max-height:calc(90vh - 28px);display:block;border-radius:12px;touch-action:none;cursor:crosshair}
+.edtxtin{position:absolute;transform:translate(-2px,-6px);background:transparent;border:1px dashed rgba(127,127,127,.7);outline:none;padding:1px 3px;margin:0;font-family:var(--font);font-weight:600;line-height:1.1;white-space:pre;overflow:hidden;resize:none;min-width:26px}
+.edside{width:290px;display:flex;flex-direction:column;gap:12px;min-height:0}
+.edtools{display:flex;gap:8px;align-items:center}
+.edtool{flex:1;height:38px;border:1px solid var(--muted);border-radius:10px;background:transparent;color:var(--text-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center;gap:6px;font-size:13px}
+.edtool svg{width:17px;height:17px}
+.edtool.on{border-color:var(--clay);color:var(--clay);background:color-mix(in srgb,var(--clay) 8%,transparent)}
+.edsep{width:1px;height:24px;background:var(--border)}
+.edpal{display:flex;gap:7px;flex-wrap:wrap}
+.edsw{width:24px;height:24px;border-radius:50%;border:2px solid var(--surface-2);box-shadow:0 0 0 1px var(--border);cursor:pointer;padding:0}
+.edsw.on{box-shadow:0 0 0 2px var(--clay);transform:scale(1.08)}
+.edprompt{width:100%;min-height:64px;border:1px solid var(--border);border-radius:10px;background:var(--surface);color:var(--text);font-family:var(--font);font-size:14px;padding:9px 11px;resize:vertical;line-height:1.4}
+.edprompt:focus{border-color:var(--clay);outline:none}
+.edrun{display:flex;align-items:center;gap:10px}
+.edstat{font-size:12px;color:var(--muted);flex:1;line-height:1.35}
+.edhint{font-size:11px;color:var(--muted);line-height:1.4}
+@media(max-width:820px){.edwrap{flex-direction:column;max-height:94vh;overflow-y:auto}.edside{width:auto}.edstage canvas{max-width:86vw}}
 .gempty{text-align:center;color:var(--muted);font-size:14px;padding:50px 0}
 textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-height:1.4}
 .disabled{opacity:.5;pointer-events:none}
@@ -206,7 +228,8 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
 </div>
 
 <div class="modal" id="modal"><div class="mbox"><h3 id="mtitle"></h3><p id="mtext"></p><div class="mbtns"><button class="mbtn" id="mcancel">Cancel</button><button class="mbtn primary" id="mok">Enable</button></div></div></div>
-<div class="lightbox" id="lightbox"><div class="lbox"><button class="lbx" id="lbClose" aria-label="Close">×</button><img id="lbImg" alt=""><div class="lbside"><label class="lblab" for="lbPrompt">Prompt · edit &amp; reuse</label><textarea class="lbprompt" id="lbPrompt" spellcheck="false"></textarea><div class="lbmeta" id="lbMeta"></div><div class="lbup" id="lbUpRow" style="display:none"><span class="lblab">Upscale</span><button class="pill" data-s="2">2×</button><button class="pill" data-s="3">3×</button><span class="lbupst" id="lbUpStatus"></span></div><div class="lbacts"><button class="iconbtn primary" id="lbUse" title="Use this prompt — send to the box &amp; generate" aria-label="Use prompt"></button><button class="iconbtn" id="lbCopy" title="Copy prompt" aria-label="Copy prompt"></button><button class="iconbtn" id="lbDl" title="Download image" aria-label="Download"></button><span class="grow"></span><button class="iconbtn danger" id="lbDel" title="Delete" aria-label="Delete"></button></div></div></div></div>
+<div class="lightbox" id="lightbox"><div class="lbox"><button class="lbx" id="lbClose" aria-label="Close">×</button><img id="lbImg" alt=""><div class="lbside"><label class="lblab" for="lbPrompt">Prompt · edit &amp; reuse</label><textarea class="lbprompt" id="lbPrompt" spellcheck="false"></textarea><div class="lbmeta" id="lbMeta"></div><div class="lbup" id="lbUpRow" style="display:none"><span class="lblab">Upscale</span><button class="pill" data-s="2">2×</button><button class="pill" data-s="3">3×</button><span class="lbupst" id="lbUpStatus"></span></div><div class="lbacts"><button class="iconbtn primary" id="lbUse" title="Use this prompt — send to the box &amp; generate" aria-label="Use prompt"></button><button class="iconbtn" id="lbEdit" title="Edit this image (draw + instruct)" aria-label="Edit image"></button><button class="iconbtn" id="lbCopy" title="Copy prompt" aria-label="Copy prompt"></button><button class="iconbtn" id="lbDl" title="Download image" aria-label="Download"></button><span class="grow"></span><button class="iconbtn danger" id="lbDel" title="Delete" aria-label="Delete"></button></div></div></div></div>
+<div class="editor" id="editor"><div class="edwrap"><button class="lbx" id="edClose" aria-label="Close">×</button><div class="edstage" id="edStage"><canvas id="edCanvas"></canvas></div><div class="edside"><label class="lblab">Edit · draw or add text, then describe the change</label><div class="edtools"><button class="edtool on" id="edSketch"></button><button class="edtool" id="edText"></button><span class="edsep"></span><button class="iconbtn" id="edUndo" title="Undo last mark" aria-label="Undo"></button><button class="iconbtn danger" id="edClear" title="Clear all marks" aria-label="Clear marks"></button></div><div class="edpal" id="edPal"></div><textarea class="edprompt" id="edPrompt" placeholder="무엇을 바꿀까요?  예: 동그라미 친 부분을 빨간색으로 / remove the marked object" spellcheck="false"></textarea><div class="edrun"><button class="gen" id="edRun"></button><span class="edstat" id="edStat"></span></div><div class="bar" id="edBarWrap" style="display:none"><i id="edBar"></i></div><div class="edhint" id="edHint"></div></div></div></div>
 
 <script>
 const $=s=>document.querySelector(s);
@@ -227,6 +250,10 @@ const SVG_GRID='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" strok
 const SVG_BACK='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z" fill="currentColor" stroke="none"/></svg>';
 const SVG_REUSE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 12a9 9 0 1 1-3-6.7L21 8"/><path d="M21 3v5h-5"/></svg>';
 const SVG_COPY='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="9" y="9" width="11" height="11" rx="2"/><path d="M5 15V5a2 2 0 0 1 2-2h10"/></svg>';
+const SVG_EDIT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 20h9"/><path d="M16.5 3.5a2.1 2.1 0 0 1 3 3L7 19l-4 1 1-4z"/></svg>';
+const SVG_PEN='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M3 17c3 0 3-6 6-6s3 6 6 6 3-6 6-6"/></svg>';
+const SVG_TEXT='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M5 6V4h14v2"/><path d="M12 4v16"/><path d="M9 20h6"/></svg>';
+const SVG_UNDO='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M9 14L4 9l5-5"/><path d="M4 9h11a5 5 0 0 1 0 10h-2"/></svg>';
 const fmt=n=>(Math.round(n*10)/10).toFixed(1);
 const showErr=m=>{errBox.textContent=m;errBox.classList.add("show");};
 const m16=(x,min,max)=>Math.max(min,Math.min(max,Math.round(x/16)*16));
@@ -287,6 +314,9 @@ function openLightbox(it){
   $("#lbUse").onclick=()=>usePrompt($("#lbPrompt").value);
   $("#lbCopy").onclick=e=>copyText($("#lbPrompt").value,e.currentTarget);
   $("#lbDl").onclick=()=>dlGalleryImg(it);
+  const edBtn=$("#lbEdit");
+  if(editAvailable()){edBtn.style.display="";edBtn.onclick=()=>{lb.classList.remove("show");openEditor("/api/gallery/"+it.id+".png",it.prompt||"");};}
+  else edBtn.style.display="none";
   $("#lbDel").onclick=()=>{lb.classList.remove("show");delGallery(it.id);};
   const upRow=$("#lbUpRow"),upSt=$("#lbUpStatus");upSt.textContent="";
   if(SYS.upscale_available){upRow.style.display="flex";
@@ -313,8 +343,112 @@ async function doUpscale(payload,scale,origPrompt){
   $("#lbUse").innerHTML=SVG_REUSE;$("#lbCopy").innerHTML=SVG_COPY;$("#lbDl").innerHTML=SVG_DL;$("#lbDel").innerHTML=SVG_TRASH;
   $("#lbClose").onclick=()=>lb.classList.remove("show");
   lb.onclick=e=>{if(e.target===lb)lb.classList.remove("show");};
-  document.addEventListener("keydown",e=>{if(e.key==="Escape")lb.classList.remove("show");});
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&!$("#editor").classList.contains("show"))lb.classList.remove("show");});
 }})();
+
+// ---- v0.7.2 canvas editor: draw / add text on an image, then run Qwen-Image Edit ----
+const $$=s=>[...document.querySelectorAll(s)];
+const EDIT_MODEL_ID="qwen-image-edit";
+const EDIT_PALETTE=["#111111","#e5484d","#f5b800","#46a758","#3b82f6","#8b5cf6","#9ca3af","#ffffff"];
+const ED={img:new Image(),ops:[],cur:null,tool:"sketch",color:"#e5484d",W:0,H:0,busy:false,aborter:null};
+function editAvailable(){return BACKENDS.some(b=>b.id===EDIT_MODEL_ID);}
+function editBuild(){   // installed edit build → {model:"qwen-image-edit:<variant>", build:<buildObj>} or null
+  const b=BACKENDS.find(x=>x.id===EDIT_MODEL_ID);if(!b||!b.variants||!b.variants.length)return null;
+  const model=EDIT_MODEL_ID+":"+b.variants[0].id;return{model,build:buildOf(model)};
+}
+function edStrokeW(){return Math.max(3,Math.round(ED.W/190));}
+function edFontPx(){return Math.max(20,Math.round(ED.W/26));}
+function edRedraw(){const c=$("#edCanvas"),x=c.getContext("2d");x.clearRect(0,0,ED.W,ED.H);
+  if(ED.img&&ED.img.width)x.drawImage(ED.img,0,0,ED.W,ED.H);
+  (ED.cur?ED.ops.concat([ED.cur]):ED.ops).forEach(op=>{
+    if(op.type==="stroke"){x.strokeStyle=op.color;x.lineWidth=op.w;x.lineJoin=x.lineCap="round";x.beginPath();
+      op.pts.forEach((p,i)=>i?x.lineTo(p.x,p.y):x.moveTo(p.x,p.y));
+      if(op.pts.length===1)x.lineTo(op.pts[0].x+0.1,op.pts[0].y+0.1);x.stroke();}
+    else if(op.type==="text"){x.fillStyle=op.color;x.font="600 "+op.size+"px "+getComputedStyle(document.body).fontFamily;x.textBaseline="top";
+      op.text.split("\n").forEach((ln,i)=>x.fillText(ln,op.x,op.y+i*op.size*1.15));}
+  });}
+function edPt(e){const c=$("#edCanvas"),r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*ED.W/r.width,y:(e.clientY-r.top)*ED.H/r.height};}
+function edSetTool(t){ED.tool=t;$("#edSketch").classList.toggle("on",t==="sketch");$("#edText").classList.toggle("on",t==="text");
+  $("#edCanvas").style.cursor=t==="text"?"text":"crosshair";}
+function edSetColor(c){ED.color=c;$$("#edPal .edsw").forEach(b=>b.classList.toggle("on",b.dataset.c===c));}
+function edLoad(src,cb){const im=new Image();im.onload=()=>{
+  let w=im.naturalWidth,h=im.naturalHeight;const cap=1280,m=Math.max(w,h);if(m>cap){w=Math.round(w*cap/m);h=Math.round(h*cap/m);}
+  const c=$("#edCanvas");c.width=w;c.height=h;ED.img=im;ED.W=w;ED.H=h;ED.ops=[];ED.cur=null;edRedraw();cb&&cb();};
+  im.onerror=()=>{$("#edStat").textContent="Couldn't load the image.";};im.src=src;}
+function edPlaceText(pt,e){
+  const stage=$("#edStage"),c=$("#edCanvas"),r=c.getBoundingClientRect(),sr=stage.getBoundingClientRect();
+  const ta=document.createElement("textarea");ta.className="edtxtin";
+  ta.style.left=(e.clientX-sr.left)+"px";ta.style.top=(e.clientY-sr.top)+"px";ta.style.color=ED.color;ta.style.fontSize=(edFontPx()*r.width/ED.W)+"px";ta.rows=1;
+  stage.appendChild(ta);setTimeout(()=>ta.focus(),0);
+  const grow=()=>{ta.style.width="auto";ta.style.width=Math.min(ta.scrollWidth+6,Math.round(r.width))+"px";ta.style.height="auto";ta.style.height=ta.scrollHeight+"px";};
+  const commit=()=>{const v=ta.value.replace(/\s+$/,"");ta.remove();if(v){ED.ops.push({type:"text",color:ED.color,x:pt.x,y:pt.y,size:edFontPx(),text:v});edRedraw();}};
+  ta.addEventListener("blur",commit);
+  ta.addEventListener("input",grow);
+  ta.addEventListener("keydown",ev=>{ev.stopPropagation();if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();ta.blur();}else if(ev.key==="Escape"){ta.value="";ta.blur();}});
+}
+function edBindCanvas(){const c=$("#edCanvas");let drawing=false;
+  c.addEventListener("pointerdown",e=>{if(ED.busy)return;e.preventDefault();
+    if(ED.tool==="text"){edPlaceText(edPt(e),e);return;}
+    drawing=true;try{c.setPointerCapture(e.pointerId);}catch(_){}ED.cur={type:"stroke",color:ED.color,w:edStrokeW(),pts:[edPt(e)]};edRedraw();});
+  c.addEventListener("pointermove",e=>{if(!drawing||!ED.cur)return;ED.cur.pts.push(edPt(e));edRedraw();});
+  const end=()=>{if(drawing&&ED.cur){ED.ops.push(ED.cur);ED.cur=null;edRedraw();}drawing=false;};
+  c.addEventListener("pointerup",end);c.addEventListener("pointercancel",end);
+}
+function openEditor(src,promptText){
+  $("#edStat").textContent="";$("#edHint").textContent="Draw with Sketch (or drop a Text label) to point at what to change, then describe it. The marks are baked in, so say e.g. “make the circled area blue”.";
+  $("#edBarWrap").style.display="none";$("#edPrompt").value="";
+  edSetTool("sketch");edSetColor(ED.color);
+  edLoad(src,()=>{$("#editor").classList.add("show");setTimeout(()=>$("#edPrompt").focus(),60);});
+}
+function edClose(){if(ED.aborter){try{ED.aborter.abort();}catch(e){}}$("#editor").classList.remove("show");}
+function edRun(){
+  if(ED.busy)return;const instr=$("#edPrompt").value.trim();
+  if(!instr){$("#edStat").textContent="Describe the change first.";$("#edPrompt").focus();return;}
+  const eb=editBuild();if(!eb){$("#edStat").textContent="Qwen-Image Edit backend isn't available.";return;}
+  const cur=eb.build;
+  if(cur&&cur.min_ram&&SYS.ram_gib&&cur.min_ram>SYS.ram_gib){
+    showModal(cur.blabel+" may not fit this Mac",
+      cur.blabel+" needs about "+cur.min_ram+" GB; this Mac has "+SYS.ram_gib+" GB. It downloads several GB and will likely run out of memory. Edit anyway?",
+      ()=>edRunGo(eb,instr,true));return;
+  }
+  edRunGo(eb,instr,false);
+}
+async function edRunGo(eb,instr,allowLow){
+  const dataUri=$("#edCanvas").toDataURL("image/png");
+  ED.busy=true;$("#edRun").disabled=true;
+  const stat=$("#edStat"),bar=$("#edBar");$("#edBarWrap").style.display="block";bar.style.width="0%";stat.textContent="Loading edit model…";
+  const body={prompt:instr,model:eb.model,safety:safetyOn,params:{init_image:dataUri,steps:4,seed:0,num_images:1,guidance:4}};
+  if(allowLow)body.allow_low_ram=true;
+  ED.aborter=new AbortController();
+  try{
+    const res=await fetch("/api/generate",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify(body),signal:ED.aborter.signal});
+    if(!res.ok||!res.body)throw new Error("server "+res.status);
+    const reader=res.body.getReader(),dec=new TextDecoder();let buf="";
+    while(true){const{value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let nl;
+      while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(!line.trim())continue;const ev=JSON.parse(line);
+        if(ev.type==="status")stat.textContent=ev.message;
+        else if(ev.type==="step"){bar.style.width=Math.round(ev.step/ev.total*100)+"%";stat.textContent="Editing · step "+ev.step+" / "+ev.total;}
+        else if(ev.type==="cancelled")stat.textContent="Stopped.";
+        else if(ev.type==="error"){stat.textContent="";showErr(ev.message);}
+        else if(ev.type==="done"){bar.style.width="100%";stat.textContent="Done — saved to gallery. Keep editing, or close.";
+          if(ev.images&&ev.images[0])edLoad(ev.images[0]);loadGallery();}
+      }}
+  }catch(e){if(e.name!=="AbortError"){stat.textContent="";showErr("Edit failed: "+e.message);}}
+  finally{ED.busy=false;$("#edRun").disabled=false;ED.aborter=null;setTimeout(()=>{$("#edBarWrap").style.display="none";},700);}
+}
+(function(){const ed=$("#editor");if(!ed)return;
+  $("#lbEdit").innerHTML=SVG_EDIT;
+  $("#edSketch").innerHTML=SVG_PEN+"<span>Sketch</span>";$("#edText").innerHTML=SVG_TEXT+"<span>Text</span>";
+  $("#edUndo").innerHTML=SVG_UNDO;$("#edClear").innerHTML=SVG_TRASH;$("#edRun").innerHTML=SVG_GEN+"<span>Edit</span>";
+  const pal=$("#edPal");EDIT_PALETTE.forEach(c=>{const b=el("button","edsw"+(c===ED.color?" on":""));b.style.background=c;b.dataset.c=c;b.title=c;b.onclick=()=>edSetColor(c);pal.appendChild(b);});
+  $("#edSketch").onclick=()=>edSetTool("sketch");$("#edText").onclick=()=>edSetTool("text");
+  $("#edUndo").onclick=()=>{ED.ops.pop();edRedraw();};
+  $("#edClear").onclick=()=>{ED.ops=[];ED.cur=null;edRedraw();};
+  $("#edRun").onclick=edRun;$("#edClose").onclick=edClose;
+  ed.onclick=e=>{if(e.target===ed)edClose();};
+  document.addEventListener("keydown",e=>{if(e.key==="Escape"&&ed.classList.contains("show")&&!document.querySelector(".edtxtin"))edClose();});
+  edBindCanvas();
+})();
 async function delGallery(id){
   try{ await fetch("/api/gallery/delete",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({id})}); }catch(e){}
   loadGallery();
