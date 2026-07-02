@@ -127,6 +127,7 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .editor.show{display:flex}
 .edwrap{position:relative;display:flex;gap:16px;padding:14px;max-width:1200px;max-height:90vh;background:var(--surface-2);border-radius:16px;box-shadow:var(--shadow)}
 .edstage{position:relative;display:flex;align-items:center;justify-content:center;background:var(--surface-1);border-radius:12px;overflow:hidden;min-width:0}
+.edstage.over{outline:2px dashed var(--clay);outline-offset:-6px}
 .edstage canvas{max-width:min(70vw,820px);max-height:calc(90vh - 28px);display:block;border-radius:12px;touch-action:none;cursor:crosshair}
 .edtxtin{position:absolute;transform:translate(-2px,-6px);background:transparent;border:1px dashed rgba(127,127,127,.7);outline:none;padding:1px 3px;margin:0;font-family:var(--font);font-weight:600;line-height:1.1;white-space:pre;overflow:hidden;resize:none;min-width:26px}
 .edside{width:304px;display:flex;flex-direction:column;gap:13px;min-height:0;overflow-y:auto}
@@ -200,6 +201,8 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
   <span class="brand">Alis Studio</span>
   <span class="ver" id="ver" title="Alis Studio v__ALIS_VERSION__">v__ALIS_VERSION__</span>
   <span style="flex:1"></span>
+  <button class="gbtn" id="editImgBtn" title="Open one of your images in the editor" style="display:none"></button>
+  <input type="file" id="editFile" accept="image/*" style="display:none">
   <button class="gbtn" id="galleryBtn" title="Gallery"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="7" height="7" rx="1.5"/><rect x="14" y="3" width="7" height="7" rx="1.5"/><rect x="3" y="14" width="7" height="7" rx="1.5"/><rect x="14" y="14" width="7" height="7" rx="1.5"/></svg>Gallery</button>
   <span class="chip" id="activeChip" title="Active model"><span class="dot"></span><span id="activeName">—</span></span>
 </div>
@@ -485,7 +488,7 @@ function edRenderHist(){const h=$("#edHist"),lb=$("#edHistLbl"),show=ED.hist.len
     h.appendChild(im);});}
 function openEditor(src){   // src = a gallery URL or a data URI; the instruction box starts empty (not the source prompt)
   const eb=editBuild(),floor=eb&&eb.build&&eb.build.min_ram;
-  let hint="Mark what to change — circle it, box it, point an arrow, or drop a label — then describe it. The marks are baked in, so say e.g. “make the circled area blue”. Your original stays in the gallery.";
+  let hint="Mark what to change — circle it, box it, point an arrow, or drop a label — then describe it. The marks are baked in, so say e.g. “make the circled area blue”. Your original stays in the gallery. Drop or paste (⌘V) another image to start over.";
   if(floor&&SYS.ram_gib&&floor>SYS.ram_gib)hint="⚠ Needs a ~"+floor+" GB Mac (this one has "+SYS.ram_gib+" GB) — the edit may run out of memory. "+hint;
   else hint+=" First edit downloads the model (~54 GB), then it's cached.";
   $("#edStat").textContent="";$("#edHint").textContent=hint;
@@ -509,6 +512,23 @@ function edRequestClose(){   // a stray backdrop click / Esc must not wipe minut
     return;
   }
   edClose();
+}
+// --- bring your own image: top-bar Edit button (file picker), drag-drop onto the editor, or paste (⌘V) ---
+function edOpenFile(file){
+  if(ED.busy)return;
+  if(!file||!file.type||!file.type.startsWith("image/")){showErr("That file isn't an image.");return;}
+  const rd=new FileReader();
+  rd.onload=()=>edOpenExternal(rd.result);
+  rd.onerror=()=>showErr("Couldn't read the image file.");
+  rd.readAsDataURL(file);
+}
+function edOpenExternal(dataUri){   // open (or replace) the editor base with a user-supplied image
+  edCommitTexts();
+  if($("#editor").classList.contains("show")&&(ED.ops.length||$("#edPrompt").value.trim())){
+    showModal("Replace the image?","Loading a new image starts a fresh edit — the current marks and instruction are discarded.",()=>openEditor(dataUri),"Replace");
+    return;
+  }
+  openEditor(dataUri);
 }
 function edRun(){
   if(ED.busy)return;
@@ -592,6 +612,22 @@ async function edRunGo(eb,instr,allowLow){
   });
   // a resize rescales the canvas display: commit any open text box (its screen position is frozen) and repaint
   window.addEventListener("resize",()=>{if(ed.classList.contains("show")){edCommitTexts();edRedraw();}});
+  // bring your own image: top-bar button → file picker; drag-drop onto the editor; paste an image anywhere
+  const fi=$("#editFile"),eb=$("#editImgBtn");
+  eb.onclick=()=>{fi.value="";fi.click();};
+  fi.onchange=()=>{if(fi.files&&fi.files[0])edOpenFile(fi.files[0]);};
+  const stage=$("#edStage");
+  ed.addEventListener("dragover",e=>{e.preventDefault();stage.classList.add("over");});
+  ed.addEventListener("dragleave",()=>stage.classList.remove("over"));
+  ed.addEventListener("drop",e=>{e.preventDefault();stage.classList.remove("over");
+    const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)edOpenFile(f);});
+  document.addEventListener("paste",e=>{
+    if(ED.busy||!editAvailable())return;
+    const items=(e.clipboardData||{}).items||[];
+    for(const it of items){
+      if(it.type&&it.type.startsWith("image/")){const f=it.getAsFile();if(f){e.preventDefault();edOpenFile(f);}return;}
+    }
+  });
   edBindCanvas();edSyncUR();
 })();
 async function delGallery(id){
@@ -608,6 +644,7 @@ async function loadAll(){
       fetch("/api/system").then(r=>r.json()).catch(()=>({})),
     ]);
     BACKENDS=m.backends||[]; CATALOG=c||{backends:[],disk_gb:0}; SYS=s||{};
+    if(editAvailable()){const b=$("#editImgBtn");b.innerHTML=SVG_EDIT+"Edit";b.style.display="";}   // bring-your-own-image entry
     if(!BACKENDS.length){showErr("No models available. Install a backend and restart.");return;}
     const builds=allBuilds(), rec=SYS.recommended;
     // start on the model recommended for this Mac (installed build preferred), else first installed

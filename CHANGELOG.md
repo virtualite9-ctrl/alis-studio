@@ -8,6 +8,14 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.7.4] — 2026-07-02
+
+### Added
+- **Bring your own image** — the canvas editor now takes *your* pictures, not just generated ones:
+  an **Edit** button in the top bar opens a file picker, and you can **drag-drop** an image onto the
+  editor or **paste (⌘V)** one from the clipboard anywhere in the app. If marks are already on the
+  canvas, replacing the image asks first ("Replace the image?").
+
 ## [0.7.3] — 2026-07-02
 
 ### Added
