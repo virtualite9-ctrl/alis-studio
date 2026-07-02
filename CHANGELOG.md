@@ -15,6 +15,11 @@ web UI, and the DMG build stamps it into the app bundle.
   an **Edit** button in the top bar opens a file picker, and you can **drag-drop** an image onto the
   editor or **paste (⌘V)** one from the clipboard anywhere in the app. If marks are already on the
   canvas, replacing the image asks first ("Replace the image?").
+- **Paste routes to the right place** — with the editor open, a pasted image replaces the editing
+  base; with it closed, it lands in the **Input image** (img2img) of the selected model and the drop
+  zone highlights; if the model is text-to-image-only (Krea 2 Turbo), it opens the editor instead.
+- The settings panel now **says why** the Input image control is missing on a text-to-image-only
+  model, and points to the models (Z-Image / Qwen-Image / FLUX) that accept one.
 
 ## [0.7.3] — 2026-07-02
 

@@ -262,6 +262,7 @@ const prompt=$("#prompt"),gen=$("#gen"),results=$("#results"),empty=$("#empty"),
 const progress=$("#progress"),barfill=$("#barfill"),pstep=$("#pstep"),ptime=$("#ptime");
 const modelGroup=$("#modelGroup"),paramGroups=$("#paramGroups"),activeName=$("#activeName"),safetyBtn=$("#safety");
 let BACKENDS=[],CATALOG={backends:[],disk_gb:0},PV={},current="",safetyOn=true,busy=false,t0=0,timer=null,aborter=null;
+let IMGSET={};   // programmatic setters for "image" params (key → set(uri)), rebuilt by renderParams — lets paste/drop feed the img2img input
 let SYS={ram_gib:0,constrained:false,enhance_available:false,enhance_model:""},enhanceOn=false,galleryOn=false;
 const SVG_DL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
 const SVG_CUBE='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.7" stroke-linejoin="round" aria-hidden="true"><path d="M12 2l9 5v10l-9 5-9-5V7z"/><path d="M3 7l9 5 9-5M12 12v10"/></svg>';
@@ -530,6 +531,14 @@ function edOpenExternal(dataUri){   // open (or replace) the editor base with a 
   }
   openEditor(dataUri);
 }
+function genImageParam(){const b=backendOf(current);return b&&(b.params||[]).find(p=>p.type==="image")||null;}
+function fillGenImage(p,uri){   // seed the generate-stage img2img input with a pasted image
+  const s=IMGSET[p.key];if(!s)return;
+  if(galleryOn)toggleGallery(false);
+  s.set(uri);
+  s.drop.scrollIntoView({block:"center",behavior:"smooth"});
+  s.drop.classList.add("over");setTimeout(()=>s.drop.classList.remove("over"),1200);   // brief highlight: "it landed here"
+}
 function edRun(){
   if(ED.busy)return;
   if(ED.cur){ED.cur=null;edRedraw();}   // Run fired mid-drag (Enter on a focused button) — don't bake a half-drawn shape
@@ -622,11 +631,13 @@ async function edRunGo(eb,instr,allowLow){
   ed.addEventListener("drop",e=>{e.preventDefault();stage.classList.remove("over");
     const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)edOpenFile(f);});
   document.addEventListener("paste",e=>{
-    if(ED.busy||!editAvailable())return;
-    const items=(e.clipboardData||{}).items||[];
-    for(const it of items){
-      if(it.type&&it.type.startsWith("image/")){const f=it.getAsFile();if(f){e.preventDefault();edOpenFile(f);}return;}
-    }
+    if(ED.busy)return;
+    let f=null;for(const it of ((e.clipboardData||{}).items||[]))if(it.type&&it.type.startsWith("image/")){f=it.getAsFile();break;}
+    if(!f)return;
+    if(ed.classList.contains("show")){e.preventDefault();edOpenFile(f);return;}   // editor open → replace its base
+    const gi=genImageParam();   // editor closed → seed the generate-stage input if this model takes one
+    if(gi){e.preventDefault();const rd=new FileReader();rd.onload=()=>fillGenImage(gi,rd.result);rd.readAsDataURL(f);}
+    else if(editAvailable()){e.preventDefault();edOpenFile(f);}   // txt2img-only model → open the editor instead
   });
   edBindCanvas();edSyncUR();
 })();
@@ -786,10 +797,12 @@ async function delVariant(b){
 async function refreshCatalog(){try{CATALOG=await(await fetch("/api/catalog")).json();}catch(e){}renderModelGroup();reconcile();}
 
 function renderParams(b){
-  paramGroups.innerHTML="";PV={};
+  paramGroups.innerHTML="";PV={};IMGSET={};
   if(!b||!b.params)return;
   const groups={};b.params.forEach(p=>(groups[p.group||"Settings"]=groups[p.group||"Settings"]||[]).push(p));
   for(const[g,ps]of Object.entries(groups)){paramGroups.appendChild(el("div","sgrp",g));ps.forEach(p=>paramGroups.appendChild(control(p)));}
+  if(!b.params.some(p=>p.type==="image"))   // say WHY the input-image control is missing, don't just hide it
+    paramGroups.appendChild(el("div","mphint","<b>"+b.label+"</b> is text-to-image only. To start from a picture, pick <b>Z-Image</b>, <b>Qwen-Image</b>, or <b>FLUX</b> (Input image + Strength), or open it in <b>Edit</b> (top bar)."));
 }
 
 // memory-aware high-res warning: what pixel budget is comfortable for this Mac's RAM
@@ -819,6 +832,7 @@ function control(p){
       if(uri){drop.innerHTML="<img class='ithumb' alt='input'><button class='irm' aria-label='Remove'>×</button>";drop.querySelector(".ithumb").src=uri;drop.querySelector(".irm").onclick=e=>{e.stopPropagation();set(null);};}
       else{drop.innerHTML="<span class='idph'>Drop an image or click to browse</span>";}};
     const read=f=>{if(f&&f.type&&f.type.indexOf("image/")===0){const fr=new FileReader();fr.onload=()=>set(fr.result);fr.readAsDataURL(f);}};
+    IMGSET[p.key]={set,drop};   // expose for paste/drop routing (fillGenImage)
     set(null);
     drop.onclick=()=>inp.click();
     inp.onchange=()=>read(inp.files[0]);
