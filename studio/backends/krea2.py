@@ -12,6 +12,7 @@ from .base import Backend
 
 
 class Krea2Backend(Backend):
+    min_ram_gib = 24   # 12.9B DiT; mixed-4/8 ~9.8 GB + activations → wants ≥24 GB
     id = "krea2-turbo"
     label = "Krea 2 Turbo"
     prompt_note = "Understands Korean and other languages natively (Qwen3 text encoder)."
@@ -21,7 +22,7 @@ class Krea2Backend(Backend):
     ]
     params = [
         {"key": "resolution", "label": "Resolution", "type": "resolution", "group": "Output",
-         "sizes": [512, 768, 1024], "default_size": 1024,
+         "sizes": [512, 768, 1024, 1280, 1536, 2048], "default_size": 1024,   # Krea 2 Turbo is a native 1K–2K model
          "aspects": ["1:1", "3:2", "2:3", "16:9", "9:16"], "default_aspect": "1:1",
          "min": 256, "max": 2048, "multiple": 16},
         {"key": "steps", "label": "Steps", "type": "int", "group": "Output",
@@ -54,6 +55,9 @@ class Krea2Backend(Backend):
     def __init__(self):
         self._pipe = None
         self._variant = None
+
+    def will_load(self, variant: str) -> bool:
+        return self._pipe is None or self._variant != variant   # mirrors the reload check in _get
 
     def _get(self, variant: str):
         import gc

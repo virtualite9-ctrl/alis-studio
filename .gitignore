@@ -15,3 +15,6 @@ out*.png
 # transient agent/session context (not part of the project)
 AGENTS.md
 .codex/
+
+# local Claude Code preview/launch config
+.claude/

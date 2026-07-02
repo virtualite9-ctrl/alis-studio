@@ -1,12 +1,16 @@
 # Alis Studio
 
 A local, **model-agnostic** image-generation studio for **Apple silicon** — a clean, native-feeling
-web UI that runs text-to-image models entirely on your Mac with [MLX](https://github.com/ml-explore/mlx).
+web UI that runs image models entirely on your Mac with [MLX](https://github.com/ml-explore/mlx):
+**text-to-image**, **image-to-image** (attach an image and transform it), and **upscaling** (SeedVR2).
 No cloud, no accounts, your images never leave your machine.
 
-Ships with **[Krea 2 Turbo](https://github.com/avlp12/krea2_alis_mlx)** (pure-MLX), plus
-**Qwen-Image** and **FLUX.1** (schnell / dev) via [mflux](https://github.com/filipstrand/mflux).
-More models plug in as small backends — see [Adding a model](#adding-a-model).
+Ships with **[Krea 2 Turbo](https://github.com/avlp12/krea2_alis_mlx)** (pure-MLX) and
+**[Z-Image Turbo](https://huggingface.co/Tongyi-MAI/Z-Image-Turbo)** (Apache-2.0 — a fast 6B model
+that **runs on a 16 GB Mac**), plus **Qwen-Image** and **FLUX.1** (schnell / dev) via
+[mflux](https://github.com/filipstrand/mflux). On launch it **detects your Mac's memory and
+recommends the model that fits best**. More models plug in as small backends — see
+[Adding a model](#adding-a-model).
 
 ![Alis Studio — a real generation in the app](assets/screenshot.png)
 
@@ -18,7 +22,9 @@ More models plug in as small backends — see [Adding a model](#adding-a-model).
 
 ## Quickstart
 
-**Requires an Apple-silicon Mac (M1+) with ≥ 24 GB unified memory.** On macOS use `python3`.
+**Requires an Apple-silicon Mac (M1+).** **Z-Image Turbo** runs on **16 GB**; the 12.9B
+**Krea 2 Turbo** wants **≥ 24 GB**. Alis Studio detects your unified memory and recommends a model
+on launch. On macOS use `python3`.
 
 ```bash
 git clone https://github.com/avlp12/alis-studio.git
@@ -68,7 +74,31 @@ too large to ship inside a DMG.
   model exposes exactly the controls it supports; the panel renders itself from the backend.
 - **Model picker** — the **Model** control in Settings opens a popover grouping every model and
   build; switch with a click, **download** (live progress) or delete weights inline, see disk usage.
-- **Live progress** — a per-step bar as the model denoises. **Light + dark** follow your system.
+  The model that best fits your Mac's memory is marked **★ Recommended** and selected by default.
+- **Live progress + Stop** — a per-step bar as the model denoises (cumulative across a multi-image
+  batch); **Stop** interrupts mid-generation. **Light + dark** follow your system.
+- **Low-memory rendering** — on **≤ 24 GB** Macs, large (≥ 1024²) renders use mflux's VAE tiling so
+  they fit (Z-Image 1024² peak ~12.9 → ~8.5 GB, no visible quality change); bigger Macs and smaller
+  renders keep the exact decode. Override with `ALIS_VAE_TILING=1`/`0`.
+- **Bigger images** — per-model max resolution: Krea 2 Turbo up to **2048²** (a native 1K–2K model),
+  Qwen-Image 1536², Z-Image / FLUX 1280². The picker warns when a size may not fit your Mac's memory.
+- **Image-to-image** — the mflux models (Z-Image / Qwen / FLUX) take an optional **Input image** +
+  **Strength**; attach a picture and transform it with your prompt. (Krea 2 Turbo is text-to-image only.)
+- **Instruction editing** — **Qwen-Image Edit** (Apache-2.0) follows an edit instruction ("make the
+  hat red", understands Korean); the output keeps the input's aspect ratio, normalized to ~1 MP
+  (≈1024²). Offered in 8-bit / bf16; it's a large model (~54 GB download, **≥ 64 GB** for 8-bit,
+  **≥ 96 GB** for bf16), so the picker warns — and the app refuses with a confirm override — when your
+  Mac is under a build's memory floor. 4-bit is intentionally omitted: mflux quantizes it to noise.
+- **Canvas editor** — hit **Edit** on any image (a fresh result or a gallery item) to open a
+  Gemini-style editor: **Sketch** freehand in a chosen
+  colour, drop **Text** labels where you click, then describe the change ("make the circled area
+  blue"). The marks are baked into the image handed to Qwen-Image Edit, which follows them and paints
+  the drawing back out; the result replaces the canvas so you can keep editing. (Needs the Qwen-Image
+  Edit backend, so a ≥ 64 GB Mac.)
+- **Upscale** — open any gallery image and **Upscale 2× / 3×** with [SeedVR2](https://github.com/ml-explore)
+  diffusion super-resolution (3B, Apache-2.0). Model downloads on first use; available on Macs with ≥ 24 GB.
+- **Gallery** — every generation is saved; click a thumbnail (or its prompt) for a lightbox with the
+  full **editable** prompt, plus Use / Copy / Download / Delete.
 - **NSFW safety filter** runs by default (pure-MLX, no PyTorch); toggle it with the shield icon.
 - Bind to your LAN with `ALIS_HOST=0.0.0.0 python3 app.py` (only on networks you trust); change
   the port with `ALIS_PORT=7861`.
@@ -84,8 +114,10 @@ downloads inline, and the previous build is freed when you switch (two big model
 
 | Model | Builds | Download |
 |---|---|---|
-| **Krea 2 Turbo** | 8-bit (14.2 GB) · mixed-4/8 (9.8 GB). 8-step Turbo. | managed in-app (resumable, with progress) |
-| **Qwen-Image** | 8/4-bit, bf16. Apache-2.0, open. | auto on first use via mflux (~40 GB) |
+| **Krea 2 Turbo** | 8-bit (14.2 GB) · mixed-4/8 (9.8 GB). 8-step Turbo. Wants ≥ 24 GB RAM. | managed in-app (resumable, with progress) |
+| **Z-Image Turbo** | 4-bit (~6 GB) · 8-bit · bf16. 9-step Turbo, Apache-2.0. **Runs on 16 GB**; multilingual (Qwen3 encoder). | auto on first use via mflux |
+| **Qwen-Image** | 8-bit, bf16. Apache-2.0, open. (No 4-bit — its ~20B transformer gets grainy below 8-bit.) | auto on first use via mflux (~40 GB) |
+| **Qwen-Image Edit** | 8-bit (needs ≥ 64 GB) · bf16 (≥ 96 GB). Apache-2.0 instruction editing. (No 4-bit — mflux quantizes it to noise.) | auto on first use via mflux (~54 GB) |
 | **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |
 | **FLUX.1 dev** | 8/4-bit, bf16. Non-commercial, **gated**. | auto on first use via mflux (~24 GB) |
 

@@ -61,6 +61,17 @@ def _registry() -> Registry:
     return _REGISTRY
 
 
+_UPSCALER = None
+
+
+def _upscaler():
+    global _UPSCALER
+    if _UPSCALER is None:
+        from .backends.upscale import Upscaler
+        _UPSCALER = Upscaler()
+    return _UPSCALER
+
+
 def _png_datauri(im) -> str:
     buf = io.BytesIO()
     im.save(buf, format="PNG")
@@ -76,6 +87,30 @@ def _apply_safety(images, enabled):
         return safety.apply(images, enabled=True)
     except Exception:
         return list(images), 0
+
+
+def _datauri_to_temp(data_uri, prefix):
+    """Decode a base64 data: URI to a temp PNG file and return its path (or None). Caller removes it."""
+    if not isinstance(data_uri, str) or not data_uri.startswith("data:"):
+        return None
+    try:
+        import tempfile
+        raw = base64.b64decode(data_uri.split(",", 1)[1])
+        fd, path = tempfile.mkstemp(prefix=prefix, suffix=".png")
+        with os.fdopen(fd, "wb") as f:
+            f.write(raw)
+        return path
+    except Exception:
+        return None
+
+
+def _stash_input_image(params):
+    """For img2img: decode an uploaded image (data URI in params['init_image']) to a temp PNG and set
+    params['image_path'] (what mflux's generate_image expects). Returns the temp path, or None."""
+    path = _datauri_to_temp(params.pop("init_image", None), "alis_in_")
+    if path:
+        params["image_path"] = path
+    return path
 
 
 def _disk_gb() -> float:
@@ -112,14 +147,40 @@ def _ram_gib() -> float:
     return _RAM_GIB
 
 
+# Quality-preference order for the "recommended for your Mac" hint: flagship first. The pick is the
+# first of these that's installed AND whose RAM floor (Backend.min_ram_gib) this machine clears.
+# Text-to-image models only — "qwen-image-edit" is intentionally omitted: it needs an input image,
+# so it's never a sensible default pick even on a large Mac.
+_RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "flux-dev", "z-image-turbo", "flux-schnell"]
+
+
+def _recommended_model(ram: float):
+    """The most capable model that fits this Mac's RAM (by _RECOMMEND_ORDER), falling back to the
+    lightest available model if nothing's floor is met. Returns (id, label); ('', '') if no models."""
+    backs = _registry().backends
+    for bid in _RECOMMEND_ORDER:
+        b = backs.get(bid)
+        if b is not None and getattr(b, "min_ram_gib", 0) <= ram:
+            return b.id, b.label
+    if backs:
+        b = min(backs.values(), key=lambda x: getattr(x, "min_ram_gib", 0))
+        return b.id, b.label
+    return "", ""
+
+
 def _system() -> dict:
-    """Capabilities the UI needs to gate the optional prompt enhancer."""
+    """Capabilities the UI needs: gate the optional prompt enhancer, and recommend a model for this Mac."""
     from . import prompt_rewrite
+    from .backends.upscale import Upscaler
     ram = _ram_gib()
+    rec_id, rec_label = _recommended_model(ram)
     return {"ram_gib": round(ram, 1),
             "constrained": 0 < ram <= ENHANCE_RAM_GIB,
             "enhance_available": prompt_rewrite.is_available(),
-            "enhance_model": prompt_rewrite.MODEL}
+            "enhance_model": prompt_rewrite.MODEL,
+            "recommended": rec_id, "recommended_label": rec_label,
+            # gate upscale on RAM too: SeedVR2-3B + a 2–4 MP target on top of a cached model needs room
+            "upscale_available": Upscaler.is_available() and ram >= Upscaler.min_ram_gib}
 
 
 def _catalog() -> dict:
@@ -146,15 +207,26 @@ def _safe_id(gid: str) -> bool:
     return bool(gid) and all(c.isalnum() or c in "-_" for c in gid)
 
 
+def _gallery_write(im, gid, ts, prompt, meta) -> str:
+    """The one writer: persist a single image + its metadata json to the gallery. Returns the id."""
+    d = _gallery_dir()
+    im.save(os.path.join(d, gid + ".png"))
+    with open(os.path.join(d, gid + ".json"), "w") as f:
+        json.dump({"id": gid, "prompt": prompt, "ts": ts, **meta}, f)
+    return gid
+
+
 def _gallery_save(images, prompt, meta) -> None:
     """Persist each generated image + its metadata to the on-disk gallery (best-effort)."""
-    d = _gallery_dir()
     base = int(time.time() * 1000)
     for i, im in enumerate(images):
-        gid = f"{base}-{int(meta.get('seed', 0))}-{i}"
-        im.save(os.path.join(d, gid + ".png"))
-        with open(os.path.join(d, gid + ".json"), "w") as f:
-            json.dump({"id": gid, "prompt": prompt, "ts": base, **meta}, f)
+        _gallery_write(im, f"{base}-{int(meta.get('seed', 0))}-{i}", base, prompt, meta)
+
+
+def _gallery_save_one(im, prompt, meta) -> str:
+    """Persist a single image and return its id (used by upscale)."""
+    ts = int(time.time() * 1000)
+    return _gallery_write(im, f"{ts}-{int(meta.get('seed', 0))}-0", ts, prompt, meta)
 
 
 def _gallery_list() -> list:
@@ -235,17 +307,22 @@ class Handler(BaseHTTPRequestHandler):
             _CANCEL.set()
             self._send(200, "application/json", b'{"ok":true}')
             return
-        if self.path not in ("/api/generate", "/api/download", "/api/delete", "/api/enhance", "/api/gallery/delete"):
+        if self.path not in ("/api/generate", "/api/upscale", "/api/download", "/api/delete", "/api/enhance", "/api/gallery/delete"):
             self._send(404, "text/plain", b"not found")
             return
         try:
             n = int(self.headers.get("Content-Length", 0))
+            if n > 128 * 1024 * 1024:   # cap the body (uploaded images are base64) — don't let a huge POST OOM us
+                self._send(413, "text/plain", b"request too large")
+                return
             req = json.loads(self.rfile.read(n) or b"{}")
         except (ValueError, json.JSONDecodeError):
             self._send(400, "text/plain", b"bad request")
             return
         if self.path == "/api/generate":
             self._generate(req)
+        elif self.path == "/api/upscale":
+            self._upscale(req)
         elif self.path == "/api/enhance":
             self._enhance(req)
         elif self.path == "/api/download":
@@ -279,6 +356,7 @@ class Handler(BaseHTTPRequestHandler):
 
         with _LOCK:
             _CANCEL.clear()           # fresh generation — forget any earlier Stop request
+            img_tmp = None            # temp file for an uploaded img2img input; removed in finally
 
             def step(s, total):       # called once per denoise step; the Stop hook lives here
                 if _CANCEL.is_set():
@@ -287,13 +365,29 @@ class Handler(BaseHTTPRequestHandler):
 
             try:
                 backend, variant = _registry().resolve(req.get("model", ""))
+                # Hard RAM gate: refuse a build whose memory floor this Mac can't meet, BEFORE mflux
+                # fetches gigabytes of weights only to OOM at load. The UI shows a confirm dialog and
+                # sends allow_low_ram=true to override; power users can set ALIS_ALLOW_LOW_RAM. A failed
+                # RAM probe (ram==0) is treated as "unknown" and allowed rather than blocking blindly.
+                ram = _ram_gib()
+                floor = backend.min_ram_for(variant)
+                allow_low = req.get("allow_low_ram") or os.environ.get("ALIS_ALLOW_LOW_RAM")
+                if ram and floor and floor > ram and not allow_low:
+                    raise ValueError(
+                        f"{backend.label} needs about {floor} GB of memory, but this Mac has "
+                        f"{ram:.0f} GB. It would download several GB and then run out of memory. "
+                        f"Run it on a Mac with more unified memory.")
                 params = dict(req.get("params") or {})
                 w = int(params.get("width") or params.get("size") or 1024)
                 h = int(params.get("height") or params.get("size") or 1024)
                 params["width"], params["height"] = w, h
+                img_tmp = _stash_input_image(params)   # img2img: decode uploaded image → params["image_path"]
                 t0 = time.time()
 
                 def _job():           # all MLX work (load, denoise, NSFW filter) on the one GPU thread
+                    if backend.will_load(variant):   # model not in memory → load (first ever use also downloads)
+                        safe_emit({"type": "status",
+                                   "message": f"Loading {backend.label}… (first use may download weights)"})
                     out = backend.generate(prompt=str(req.get("prompt", "")), variant=variant,
                                            params=params, step_callback=step)
                     if _CANCEL.is_set():  # stopped after the last step, or by a backend that doesn't tick
@@ -301,7 +395,10 @@ class Handler(BaseHTTPRequestHandler):
                     return _apply_safety(out, req.get("safety", True))
 
                 imgs, flagged = _gpu(_job)
-                meta = {"model": backend.label, "width": w, "height": h,
+                # report the ACTUAL output size — edit models normalize to ~1 MP and others may round
+                # to a multiple of 16, so the produced image can differ from the requested w/h
+                ow, oh = (imgs[0].width, imgs[0].height) if imgs else (w, h)
+                meta = {"model": backend.label, "width": ow, "height": oh,
                         "steps": int(params.get("steps", 8)), "seed": int(params.get("seed", 0)),
                         "seconds": round(time.time() - t0, 1)}
                 try:
@@ -326,6 +423,76 @@ class Handler(BaseHTTPRequestHandler):
                                "images, or a lighter model build."})
                 else:
                     safe_emit({"type": "error", "message": f"Generation failed: {e}"})
+            finally:
+                if img_tmp:
+                    try:
+                        os.remove(img_tmp)
+                    except OSError:
+                        pass
+
+    def _upscale(self, req):
+        emit = self._stream()
+
+        def safe_emit(obj):
+            try:
+                emit(obj)
+            except OSError:
+                pass
+
+        scale = 3 if int(req.get("scale", 2) or 2) == 3 else 2
+        # resolve the source image to a local path: a gallery id, or an uploaded data URI
+        src_path, src_tmp, orig_prompt = None, None, str(req.get("prompt", "") or "")
+        gid = str(req.get("id", ""))
+        if gid and _safe_id(gid):
+            p = os.path.join(_gallery_dir(), gid + ".png")
+            if os.path.exists(p):
+                src_path = p
+                try:
+                    with open(os.path.join(_gallery_dir(), gid + ".json")) as f:
+                        orig_prompt = json.load(f).get("prompt", orig_prompt)
+                except Exception:
+                    pass
+        if src_path is None:
+            src_tmp = _datauri_to_temp(req.get("image"), "alis_up_")
+            src_path = src_tmp
+        if not src_path:
+            safe_emit({"type": "error", "message": "No image to upscale."})
+            return
+
+        up = _upscaler()
+        with _LOCK:
+            t0 = time.time()
+            try:
+                def _job():
+                    if up.will_load():
+                        safe_emit({"type": "status", "message": "Loading the SeedVR2 upscaler… (first use downloads ~7 GB)"})
+                    safe_emit({"type": "status", "message": f"Upscaling {scale}×…"})
+                    return _apply_safety([up.upscale(src_path, scale)], req.get("safety", True))
+
+                imgs, flagged = _gpu(_job)
+                im = imgs[0]
+                meta = {"model": f"SeedVR2 · {scale}× upscale", "width": im.width, "height": im.height,
+                        "steps": 0, "seed": 0, "seconds": round(time.time() - t0, 1)}
+                newid = None
+                try:
+                    newid = _gallery_save_one(im, orig_prompt, meta)
+                except Exception:
+                    pass
+                emit({"type": "done", "flagged": flagged, "image": _png_datauri(im), "id": newid, "meta": meta})
+            except (BrokenPipeError, ConnectionResetError):
+                return
+            except Exception as e:
+                m = str(e).lower()
+                if any(k in m for k in ("memory", "alloc", "metal")):
+                    safe_emit({"type": "error", "message": "Out of memory upscaling — try 2× instead of 3×, or a smaller image."})
+                else:
+                    safe_emit({"type": "error", "message": f"Upscale failed: {e}"})
+            finally:
+                if src_tmp:
+                    try:
+                        os.remove(src_tmp)
+                    except OSError:
+                        pass
 
     def _enhance(self, req):
         from . import prompt_rewrite
