@@ -8,6 +8,26 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.7.3] — 2026-07-02
+
+### Added
+- **Shape tools** — the canvas editor grows from Sketch/Text to five tools: **Sketch, Circle, Box,
+  Arrow, Text**. Shapes are drag-drawn with a live preview; a bare click with a shape tool is
+  ignored (no accidental dots).
+- **Stroke sizes** — Thin / Medium / Thick, applied to strokes, shapes, and text.
+- **Redo** — full undo/redo for every mark (including text), with **⌘Z / ⇧⌘Z** while the editor
+  is open (text fields keep their native undo).
+- **Step history** — every edit result joins a thumbnail strip (*Original → Step 1 → …*); click a
+  step to put it back on the canvas and continue from there. Nothing is lost between takes.
+- **Fast / Fine quality** — 4-step (default) or 8-step edits, one tap.
+- Each run now uses a **fresh random seed**, so "Edit" again on the same marks gives a new take.
+
+### Changed
+- Editor side panel reorganized ("Quiet Workshop" pass): sectioned Mark it / Describe the change /
+  Steps, an icon toolbar, size dots, and disabled-state Undo/Redo. The base image is pre-rendered
+  once, so long strokes stay smooth on big images; coordinates are guarded against a not-yet-laid-out
+  canvas.
+
 ## [0.7.2] — 2026-07-02
 
 ### Added
