@@ -89,6 +89,12 @@ too large to ship inside a DMG.
   (≈1024²). Offered in 8-bit / bf16; it's a large model (~54 GB download, **≥ 64 GB** for 8-bit,
   **≥ 96 GB** for bf16), so the picker warns — and the app refuses with a confirm override — when your
   Mac is under a build's memory floor. 4-bit is intentionally omitted: mflux quantizes it to noise.
+- **Canvas editor** — hit **Edit** on any image (a fresh result or a gallery item) to open a
+  Gemini-style editor: **Sketch** freehand in a chosen
+  colour, drop **Text** labels where you click, then describe the change ("make the circled area
+  blue"). The marks are baked into the image handed to Qwen-Image Edit, which follows them and paints
+  the drawing back out; the result replaces the canvas so you can keep editing. (Needs the Qwen-Image
+  Edit backend, so a ≥ 64 GB Mac.)
 - **Upscale** — open any gallery image and **Upscale 2× / 3×** with [SeedVR2](https://github.com/ml-explore)
   diffusion super-resolution (3B, Apache-2.0). Model downloads on first use; available on Macs with ≥ 24 GB.
 - **Gallery** — every generation is saved; click a thumbnail (or its prompt) for a lightbox with the

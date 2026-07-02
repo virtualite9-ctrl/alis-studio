@@ -8,6 +8,17 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.7.2] — 2026-07-02
+
+### Added
+- **Canvas editor (draw + instruct)** — hit **Edit** on any image (a fresh result or a gallery item)
+  to open a Gemini-style editor: **Sketch** freehand in a chosen color, drop **Text** labels (click a spot →
+  a transparent-background text box), then describe the change ("make the circled area blue"). The
+  marks are baked into the image sent to **Qwen-Image Edit**, which follows them and paints the
+  drawing out. The result replaces the canvas so you can **keep editing**, and every step is saved
+  to the gallery. Colour palette, Undo, and Clear included.
+  - Requires the Qwen-Image Edit backend (≥ 64 GB Mac); the same RAM confirm/gate applies before a run.
+
 ## [0.7.1] — 2026-07-02
 
 ### Added
