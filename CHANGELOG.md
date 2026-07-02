@@ -18,9 +18,12 @@ web UI, and the DMG build stamps it into the app bundle.
 - **Redo** — full undo/redo for every mark (including text), with **⌘Z / ⇧⌘Z** while the editor
   is open (text fields keep their native undo).
 - **Step history** — every edit result joins a thumbnail strip (*Original → Step 1 → …*); click a
-  step to put it back on the canvas and continue from there. Nothing is lost between takes.
+  step to put it back on the canvas and continue from there (results also live in the gallery).
 - **Fast / Fine quality** — 4-step (default) or 8-step edits, one tap.
 - Each run now uses a **fresh random seed**, so "Edit" again on the same marks gives a new take.
+- **Discard guards** — closing the editor (✕ / backdrop / Esc) or switching steps now asks before
+  throwing away unsaved marks; Esc during a drag abandons just that drag; Clear can be brought back
+  with Redo. ⌘Z/⇧⌘Z use the physical key, so undo works under a Korean input source.
 
 ### Changed
 - Editor side panel reorganized ("Quiet Workshop" pass): sectioned Mark it / Describe the change /
