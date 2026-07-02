@@ -79,7 +79,7 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .sw i{position:absolute;top:2px;left:2px;width:16px;height:16px;border-radius:50%;background:var(--text-2);transition:transform .15s,background .15s}
 .sw.on{background:var(--clay);border-color:var(--clay)}.sw.on i{transform:translateX(16px);background:var(--on-clay)}
 .sw.disabled{opacity:.45;cursor:not-allowed}
-.modal{position:fixed;inset:0;background:rgba(20,18,16,.45);display:none;align-items:center;justify-content:center;z-index:50;padding:20px}
+.modal{position:fixed;inset:0;background:rgba(20,18,16,.45);display:none;align-items:center;justify-content:center;z-index:90;padding:20px}
 .modal.show{display:flex}
 .mbox{background:var(--surface-2);border:0.5px solid var(--border-strong);border-radius:16px;max-width:390px;padding:18px 18px 14px;box-shadow:0 16px 44px rgba(20,18,16,.3)}
 .mbox h3{margin:0 0 8px;font-size:15px;font-weight:600;color:var(--text)}.mbox p{margin:0 0 15px;font-size:13px;color:var(--text-2);line-height:1.5}
@@ -178,7 +178,7 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
 .cap{display:flex;align-items:center;gap:10px;padding:10px 12px}
 .cap .txt{font-size:13px;color:var(--text-2);overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
 .cap .meta{margin-left:auto;font-size:12px;color:var(--muted);font-family:var(--mono);white-space:nowrap}
-.cap a{color:var(--text-2);display:inline-flex}.cap a:hover{color:var(--text)}.cap a svg{width:17px;height:17px}
+.cap a{color:var(--text-2);display:inline-flex;cursor:pointer}.cap a:hover{color:var(--text)}.cap a svg{width:17px;height:17px}
 .empty{text-align:center;color:var(--muted);font-size:14px;padding-top:6px}
 .empty svg{width:100%;border-radius:14px;border:1px solid var(--border);display:block;margin:0 auto 12px;opacity:.85}
 .err{display:none;border:1px solid var(--border);border-left:3px solid var(--clay);background:var(--surface-1);color:var(--text);font-size:13px;padding:11px 13px;border-radius:0 var(--radius) var(--radius) 0}.err.show{display:block}
@@ -352,13 +352,14 @@ const EDIT_MODEL_ID="qwen-image-edit";
 const EDIT_PALETTE=["#111111","#e5484d","#f5b800","#46a758","#3b82f6","#8b5cf6","#9ca3af","#ffffff"];
 const ED={img:new Image(),ops:[],cur:null,tool:"sketch",color:"#e5484d",W:0,H:0,busy:false,aborter:null};
 function editAvailable(){return BACKENDS.some(b=>b.id===EDIT_MODEL_ID);}
-function editBuild(){   // installed edit build → {model:"qwen-image-edit:<variant>", build:<buildObj>} or null
+function editBuild(){   // edit build → {model:"qwen-image-edit:<variant>", build:<buildObj>} or null
   const b=BACKENDS.find(x=>x.id===EDIT_MODEL_ID);if(!b||!b.variants||!b.variants.length)return null;
-  const model=EDIT_MODEL_ID+":"+b.variants[0].id;return{model,build:buildOf(model)};
+  const model=EDIT_MODEL_ID+":"+b.variants[0].id;   // default to the first (8-bit) build — the editor doesn't expose bf16
+  return{model,build:buildOf(model)};
 }
 function edStrokeW(){return Math.max(3,Math.round(ED.W/190));}
 function edFontPx(){return Math.max(20,Math.round(ED.W/26));}
-function edRedraw(){const c=$("#edCanvas"),x=c.getContext("2d");x.clearRect(0,0,ED.W,ED.H);
+function edRedraw(){const c=$("#edCanvas"),x=c.getContext("2d");x.setTransform(ED.dpr||1,0,0,ED.dpr||1,0,0);x.clearRect(0,0,ED.W,ED.H);
   if(ED.img&&ED.img.width)x.drawImage(ED.img,0,0,ED.W,ED.H);
   (ED.cur?ED.ops.concat([ED.cur]):ED.ops).forEach(op=>{
     if(op.type==="stroke"){x.strokeStyle=op.color;x.lineWidth=op.w;x.lineJoin=x.lineCap="round";x.beginPath();
@@ -368,23 +369,31 @@ function edRedraw(){const c=$("#edCanvas"),x=c.getContext("2d");x.clearRect(0,0,
       op.text.split("\n").forEach((ln,i)=>x.fillText(ln,op.x,op.y+i*op.size*1.15));}
   });}
 function edPt(e){const c=$("#edCanvas"),r=c.getBoundingClientRect();return{x:(e.clientX-r.left)*ED.W/r.width,y:(e.clientY-r.top)*ED.H/r.height};}
-function edSetTool(t){ED.tool=t;$("#edSketch").classList.toggle("on",t==="sketch");$("#edText").classList.toggle("on",t==="text");
+function edSetTool(t){edCommitTexts();ED.tool=t;
+  const sk=$("#edSketch"),tx=$("#edText");sk.classList.toggle("on",t==="sketch");tx.classList.toggle("on",t==="text");
+  sk.setAttribute("aria-pressed",t==="sketch");tx.setAttribute("aria-pressed",t==="text");
   $("#edCanvas").style.cursor=t==="text"?"text":"crosshair";}
 function edSetColor(c){ED.color=c;$$("#edPal .edsw").forEach(b=>b.classList.toggle("on",b.dataset.c===c));}
 function edLoad(src,cb){const im=new Image();im.onload=()=>{
   let w=im.naturalWidth,h=im.naturalHeight;const cap=1280,m=Math.max(w,h);if(m>cap){w=Math.round(w*cap/m);h=Math.round(h*cap/m);}
-  const c=$("#edCanvas");c.width=w;c.height=h;ED.img=im;ED.W=w;ED.H=h;ED.ops=[];ED.cur=null;edRedraw();cb&&cb();};
+  const dpr=Math.min(window.devicePixelRatio||1,2);   // crisp strokes/text on Retina; CSS max-* scales the display down
+  const c=$("#edCanvas");c.width=Math.round(w*dpr);c.height=Math.round(h*dpr);
+  ED.img=im;ED.W=w;ED.H=h;ED.dpr=dpr;ED.ops=[];ED.cur=null;edClearTexts();edRedraw();cb&&cb();};
   im.onerror=()=>{$("#edStat").textContent="Couldn't load the image.";};im.src=src;}
 function edPlaceText(pt,e){
+  edCommitTexts();   // bake/close any open text box first — one at a time
   const stage=$("#edStage"),c=$("#edCanvas"),r=c.getBoundingClientRect(),sr=stage.getBoundingClientRect();
   const ta=document.createElement("textarea");ta.className="edtxtin";
-  ta.style.left=(e.clientX-sr.left)+"px";ta.style.top=(e.clientY-sr.top)+"px";ta.style.color=ED.color;ta.style.fontSize=(edFontPx()*r.width/ED.W)+"px";ta.rows=1;
+  const col=ED.color,size=edFontPx();   // capture colour + size at placement, not at commit
+  ta.style.left=(e.clientX-sr.left)+"px";ta.style.top=(e.clientY-sr.top)+"px";ta.style.color=col;ta.style.fontSize=(size*r.width/ED.W)+"px";ta.rows=1;
   stage.appendChild(ta);setTimeout(()=>ta.focus(),0);
   const grow=()=>{ta.style.width="auto";ta.style.width=Math.min(ta.scrollWidth+6,Math.round(r.width))+"px";ta.style.height="auto";ta.style.height=ta.scrollHeight+"px";};
-  const commit=()=>{const v=ta.value.replace(/\s+$/,"");ta.remove();if(v){ED.ops.push({type:"text",color:ED.color,x:pt.x,y:pt.y,size:edFontPx(),text:v});edRedraw();}};
+  let done=false;
+  const commit=()=>{if(done)return;done=true;const v=ta.value.replace(/\s+$/,"");ta.remove();if(v){ED.ops.push({type:"text",color:col,x:pt.x,y:pt.y,size,text:v});edRedraw();}};
+  ta.__commit=commit;
   ta.addEventListener("blur",commit);
   ta.addEventListener("input",grow);
-  ta.addEventListener("keydown",ev=>{ev.stopPropagation();if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();ta.blur();}else if(ev.key==="Escape"){ta.value="";ta.blur();}});
+  ta.addEventListener("keydown",ev=>{ev.stopPropagation();if(ev.key==="Enter"&&!ev.shiftKey){ev.preventDefault();ta.blur();commit();}else if(ev.key==="Escape"){ta.value="";ta.blur();commit();}});
 }
 function edBindCanvas(){const c=$("#edCanvas");let drawing=false;
   c.addEventListener("pointerdown",e=>{if(ED.busy)return;e.preventDefault();
@@ -394,13 +403,23 @@ function edBindCanvas(){const c=$("#edCanvas");let drawing=false;
   const end=()=>{if(drawing&&ED.cur){ED.ops.push(ED.cur);ED.cur=null;edRedraw();}drawing=false;};
   c.addEventListener("pointerup",end);c.addEventListener("pointercancel",end);
 }
-function openEditor(src,promptText){
-  $("#edStat").textContent="";$("#edHint").textContent="Draw with Sketch (or drop a Text label) to point at what to change, then describe it. The marks are baked in, so say e.g. “make the circled area blue”.";
+function openEditor(src){   // src = a gallery URL or a data URI; the instruction box starts empty (not the source prompt)
+  const eb=editBuild(),floor=eb&&eb.build&&eb.build.min_ram;
+  let hint="Draw with Sketch or drop a Text label to mark what to change, then describe it — the marks are baked in, so say e.g. “make the circled area blue”. Your original stays in the gallery.";
+  if(floor&&SYS.ram_gib&&floor>SYS.ram_gib)hint="⚠ Needs a ~"+floor+" GB Mac (this one has "+SYS.ram_gib+" GB) — the edit may run out of memory. "+hint;
+  else hint+=" First edit downloads the model (~54 GB), then it's cached.";
+  $("#edStat").textContent="";$("#edHint").textContent=hint;
   $("#edBarWrap").style.display="none";$("#edPrompt").value="";
   edSetTool("sketch");edSetColor(ED.color);
   edLoad(src,()=>{$("#editor").classList.add("show");setTimeout(()=>$("#edPrompt").focus(),60);});
 }
-function edClose(){if(ED.aborter){try{ED.aborter.abort();}catch(e){}}$("#editor").classList.remove("show");}
+function edClearTexts(){$$("#edStage .edtxtin").forEach(n=>n.remove());}          // discard pending text
+function edCommitTexts(){$$("#edStage .edtxtin").forEach(n=>n.__commit?n.__commit():n.remove());}  // bake pending text
+function edClose(){
+  if(ED.busy){fetch("/api/cancel",{method:"POST"}).catch(()=>{});}   // stop the server job too, not just the client fetch
+  if(ED.aborter){try{ED.aborter.abort();}catch(e){}}
+  edClearTexts();$("#editor").classList.remove("show");
+}
 function edRun(){
   if(ED.busy)return;const instr=$("#edPrompt").value.trim();
   if(!instr){$("#edStat").textContent="Describe the change first.";$("#edPrompt").focus();return;}
@@ -414,6 +433,7 @@ function edRun(){
   edRunGo(eb,instr,false);
 }
 async function edRunGo(eb,instr,allowLow){
+  edCommitTexts();   // bake any still-open text box before flattening
   const dataUri=$("#edCanvas").toDataURL("image/png");
   ED.busy=true;$("#edRun").disabled=true;
   const stat=$("#edStat"),bar=$("#edBar");$("#edBarWrap").style.display="block";bar.style.width="0%";stat.textContent="Loading edit model…";
@@ -444,9 +464,12 @@ async function edRunGo(eb,instr,allowLow){
   $("#edSketch").onclick=()=>edSetTool("sketch");$("#edText").onclick=()=>edSetTool("text");
   $("#edUndo").onclick=()=>{ED.ops.pop();edRedraw();};
   $("#edClear").onclick=()=>{ED.ops=[];ED.cur=null;edRedraw();};
+  $("#edSketch").setAttribute("aria-pressed","true");$("#edText").setAttribute("aria-pressed","false");
   $("#edRun").onclick=edRun;$("#edClose").onclick=edClose;
   ed.onclick=e=>{if(e.target===ed)edClose();};
   document.addEventListener("keydown",e=>{if(e.key==="Escape"&&ed.classList.contains("show")&&!document.querySelector(".edtxtin"))edClose();});
+  // a resize rescales the canvas display: commit any open text box (its screen position is frozen) and repaint
+  window.addEventListener("resize",()=>{if(ed.classList.contains("show")){edCommitTexts();edRedraw();}});
   edBindCanvas();
 })();
 async function delGallery(id){
@@ -714,8 +737,11 @@ function handle(ev,p){
 }
 function renderCard(uri,p,meta,i,n){
   const card=el("div","card");const sl=meta.seed+(n>1?("·"+(i+1)):"");
-  card.innerHTML='<img alt="'+p.replace(/"/g,"&quot;")+'" src="'+uri+'"><div class="cap"><span class="txt">'+p+'</span><span class="meta">'+meta.model+' · '+meta.width+'×'+meta.height+' · '+meta.steps+' steps · seed '+sl+' · '+fmt(meta.seconds)+'s</span><a title="Download" aria-label="Download">'+SVG_DL+'</a></div>';
-  card.querySelector("a").onclick=()=>{const a=document.createElement("a");a.href=uri;a.download="alis_"+meta.seed+(n>1?("_"+(i+1)):"")+".png";a.click();};
+  const edBtn=editAvailable()?'<a class="cedit" title="Edit this image" aria-label="Edit">'+SVG_EDIT+'</a>':'';
+  card.innerHTML='<img alt="'+p.replace(/"/g,"&quot;")+'" src="'+uri+'"><div class="cap"><span class="txt">'+p+'</span><span class="meta">'+meta.model+' · '+meta.width+'×'+meta.height+' · '+meta.steps+' steps · seed '+sl+' · '+fmt(meta.seconds)+'s</span>'+edBtn+'<a title="Download" aria-label="Download">'+SVG_DL+'</a></div>';
+  const dl=card.querySelector(".cap a:last-child");
+  dl.onclick=()=>{const a=document.createElement("a");a.href=uri;a.download="alis_"+meta.seed+(n>1?("_"+(i+1)):"")+".png";a.click();};
+  const ce=card.querySelector(".cedit");if(ce)ce.onclick=()=>openEditor(uri,p);
   results.insertBefore(card,results.firstChild);
 }
 // version is normally substituted server-side; fall back to /api/version if served raw
