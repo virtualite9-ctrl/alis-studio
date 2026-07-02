@@ -532,9 +532,10 @@ function edOpenExternal(dataUri){   // open (or replace) the editor base with a 
   openEditor(dataUri);
 }
 function genImageParam(){const b=backendOf(current);return b&&(b.params||[]).find(p=>p.type==="image")||null;}
-function fillGenImage(p,uri){   // seed the generate-stage img2img input with a pasted image
+function fillGenImage(p,uri){   // seed the generate-stage img2img input with a pasted/dropped image
   const s=IMGSET[p.key];if(!s)return;
   if(galleryOn)toggleGallery(false);
+  $("#lightbox").classList.remove("show");   // the fill must be visible — not hidden behind an overlay
   s.set(uri);
   s.drop.scrollIntoView({block:"center",behavior:"smooth"});
   s.drop.classList.add("over");setTimeout(()=>s.drop.classList.remove("over"),1200);   // brief highlight: "it landed here"
@@ -630,6 +631,8 @@ async function edRunGo(eb,instr,allowLow){
   ed.addEventListener("dragleave",()=>stage.classList.remove("over"));
   ed.addEventListener("drop",e=>{e.preventDefault();stage.classList.remove("over");
     const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];if(f)edOpenFile(f);});
+  // NOTE app-global input routing (paste + stray drops) lives here beside the editor because both
+  // funnel into edOpenFile/fillGenImage; the dedicated .imgdrop zones keep their own handlers.
   document.addEventListener("paste",e=>{
     if(ED.busy)return;
     let f=null;for(const it of ((e.clipboardData||{}).items||[]))if(it.type&&it.type.startsWith("image/")){f=it.getAsFile();break;}
@@ -638,6 +641,18 @@ async function edRunGo(eb,instr,allowLow){
     const gi=genImageParam();   // editor closed → seed the generate-stage input if this model takes one
     if(gi){e.preventDefault();const rd=new FileReader();rd.onload=()=>fillGenImage(gi,rd.result);rd.readAsDataURL(f);}
     else if(editAvailable()){e.preventDefault();edOpenFile(f);}   // txt2img-only model → open the editor instead
+  });
+  // a stray drop anywhere must never navigate the WebView to the file (the native app has no Back
+  // button — the session would be gone). Route it like paste; dedicated zones handle their own drops.
+  document.addEventListener("dragover",e=>e.preventDefault());
+  document.addEventListener("drop",e=>{
+    e.preventDefault();
+    if(e.target&&e.target.closest&&(e.target.closest(".imgdrop")||e.target.closest("#editor")))return;
+    const f=e.dataTransfer&&e.dataTransfer.files&&e.dataTransfer.files[0];
+    if(!f||!f.type||!f.type.startsWith("image/")||ED.busy)return;
+    const gi=genImageParam();
+    if(gi){const rd=new FileReader();rd.onload=()=>fillGenImage(gi,rd.result);rd.readAsDataURL(f);}
+    else if(editAvailable())edOpenFile(f);
   });
   edBindCanvas();edSyncUR();
 })();
@@ -655,7 +670,7 @@ async function loadAll(){
       fetch("/api/system").then(r=>r.json()).catch(()=>({})),
     ]);
     BACKENDS=m.backends||[]; CATALOG=c||{backends:[],disk_gb:0}; SYS=s||{};
-    if(editAvailable()){const b=$("#editImgBtn");b.innerHTML=SVG_EDIT+"Edit";b.style.display="";}   // bring-your-own-image entry
+    if(editAvailable()){const b=$("#editImgBtn");b.innerHTML=SVG_EDIT+"Edit image";b.style.display="";}   // bring-your-own-image entry ("Edit image" — distinct from the img2img Input image)
     if(!BACKENDS.length){showErr("No models available. Install a backend and restart.");return;}
     const builds=allBuilds(), rec=SYS.recommended;
     // start on the model recommended for this Mac (installed build preferred), else first installed
