@@ -8,6 +8,17 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.8.1] — 2026-07-03
+
+### Added
+- **FLUX.2 klein 4B** — BFL's January-2026 fast model (Apache-2.0, **ungated** — no HF login,
+  unlike FLUX.1): ~4-step distilled, ~15 GB download, 4-bit build runs on a 16 GB Mac. img2img and
+  LoRA included. The 9B sibling stays out (gated, restrictive license).
+- **Generation queue** — while a run is in flight, a **Queue** button appears next to Stop: it
+  snapshots the current prompt + model + settings as the next job. Queued jobs run back-to-back
+  (each gets its own seed when auto-seed is on); the badge shows how many are waiting, and **Stop
+  clears the queue**.
+
 ## [0.8.0] — 2026-07-03
 
 ### Added

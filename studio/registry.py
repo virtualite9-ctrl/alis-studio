@@ -7,14 +7,15 @@ dependencies aren't installed are skipped automatically, so the app runs with wh
 from __future__ import annotations
 
 from .backends.cyber_z import CyberRealisticZBackend
+from .backends.flux2 import Flux2KleinBackend
 from .backends.krea2 import Krea2Backend
 from .backends.mflux_models import FluxDevBackend, FluxSchnellBackend, QwenImageBackend
 from .backends.qwen_edit import QwenImageEditBackend
 from .backends.z_image import ZImageTurboBackend
 
 # register additional models here — a backend whose deps aren't importable is skipped automatically
-BACKENDS = [Krea2Backend, ZImageTurboBackend, CyberRealisticZBackend, QwenImageBackend, QwenImageEditBackend,
-            FluxSchnellBackend, FluxDevBackend]
+BACKENDS = [Krea2Backend, ZImageTurboBackend, CyberRealisticZBackend, Flux2KleinBackend, QwenImageBackend,
+            QwenImageEditBackend, FluxSchnellBackend, FluxDevBackend]
 
 
 class Registry:

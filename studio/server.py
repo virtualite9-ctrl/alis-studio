@@ -187,7 +187,7 @@ def _ram_gib() -> float:
 # first of these that's installed AND whose RAM floor (Backend.min_ram_gib) this machine clears.
 # Text-to-image models only — "qwen-image-edit" is intentionally omitted (it needs an input image),
 # and so is "cyberrealistic-z" (community finetune: don't default users onto third-party weights).
-_RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "flux-dev", "z-image-turbo", "flux-schnell"]
+_RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "flux-dev", "z-image-turbo", "flux2-klein", "flux-schnell"]
 
 
 def _recommended_model(ram: float):
