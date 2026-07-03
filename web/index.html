@@ -40,9 +40,10 @@ button,select,a,.ap,.edsw,.edsz,.edthumb,.mpr,.gcard img{cursor:pointer}
 ::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 45%,transparent);border-radius:5px;border:2px solid transparent;background-clip:content-box}
 ::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--muted) 70%,transparent);background-clip:content-box}
 ::-webkit-scrollbar-track{background:transparent}
-/* inside the pywebview app: content extends under the hidden titlebar — inset for the traffic
-   lights, and let the whole top bar drag the window (buttons opt out) */
-body.native .top{padding-left:86px;padding-top:13px;padding-bottom:13px}
+/* inside the pywebview app the content extends under the hidden titlebar. macOS may still draw
+   titlebar material over the first ~28px, so nothing real may live there: a same-colour spacer
+   (injected by arm()) owns that strip and doubles as the window drag area. */
+.titlebar-spacer{height:28px;background:var(--surface-2);flex:none}
 body.native .top .ver{user-select:none}
 body.native.winblur .top{opacity:.72}
 body.native.winblur .brand,body.native.winblur .logo{filter:grayscale(.5)}
@@ -333,6 +334,9 @@ document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.code==="Key
   const arm=()=>{
     if(document.body.classList.contains("native"))return;
     document.body.classList.add("native");
+    // own the titlebar strip: a same-colour spacer keeps content clear of the overlay material
+    const tb=document.createElement("div");tb.className="titlebar-spacer pywebview-drag-region";
+    document.body.prepend(tb);
     // the top bar's passive parts drag the window (buttons/chips stay clickable)
     document.querySelectorAll(".top .logo,.top .brand,.top .ver").forEach(n=>n.classList.add("pywebview-drag-region"));
     const sp=document.querySelector('.top span[style*="flex:1"]');if(sp)sp.classList.add("pywebview-drag-region");

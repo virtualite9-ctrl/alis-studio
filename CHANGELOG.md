@@ -8,6 +8,14 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.8.3] — 2026-07-03
+
+### Fixed
+- **Top bar was clipped under the titlebar** in the native window (v0.8.2 regression): macOS can
+  still draw titlebar material over the first ~28 px even with a transparent titlebar, so the top
+  bar's content was sliced. The app now injects a same-colour titlebar spacer that owns that strip
+  (and doubles as the window drag area) — nothing real renders under the material anymore.
+
 ## [0.8.2] — 2026-07-03
 
 ### Changed
