@@ -8,6 +8,23 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.8.0] — 2026-07-03
+
+### Added
+- **LoRA support** — the capability people run ComfyUI for, without the node graph. Every mflux
+  model (Z-Image, CyberRealistic Z, Qwen-Image, Qwen-Image Edit, FLUX) gets a **LoRA** section:
+  a shared library (add by **Civitai/HF download URL** or a local `.safetensors` path), check the
+  ones to apply, and set a per-LoRA strength (0–2). Multiple LoRAs stack; Civitai's
+  ComfyUI/kohya/diffusers key formats are recognized automatically (mflux). Changing the set
+  reloads the model (seconds — LoRA is fused at load). Auth-gated Civitai downloads work with
+  `CIVITAI_API_TOKEN` set.
+- **Restore settings** — every gallery item now stores its full recipe (model, build, size, steps,
+  seed, guidance, LoRAs + strengths). A new lightbox button restores all of it — model switched,
+  controls repopulated, prompt refilled — so any past image is one click from a re-run or a tweak.
+  The recipe is also embedded in the PNG itself (`tEXt "alis"`), like ComfyUI's workflow-in-PNG.
+- **Auto-seed** — a new toggle next to the seed dice rolls a fresh random seed on every Generate
+  (the seed box always shows what was used, so results stay reproducible).
+
 ## [0.7.5] — 2026-07-03
 
 ### Added

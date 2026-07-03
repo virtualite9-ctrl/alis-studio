@@ -243,12 +243,124 @@ def _safe_id(gid: str) -> bool:
     return bool(gid) and all(c.isalnum() or c in "-_" for c in gid)
 
 
+# ---------------------------------------------------------------------------- LoRA library
+def _lora_dir() -> str:
+    d = os.path.join(os.path.expanduser("~/Library/Application Support/Alis Studio"), "loras")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _safe_lora_name(name: str) -> bool:
+    """Library entries are flat .safetensors files; names must not traverse."""
+    return (bool(name) and name.endswith(".safetensors") and "/" not in name and "\\" not in name
+            and not name.startswith(".") and all(c.isalnum() or c in "-_. " for c in name))
+
+
+def _lora_list() -> list:
+    d = _lora_dir()
+    items = []
+    for fn in sorted(os.listdir(d)):
+        if fn.endswith(".safetensors") and _safe_lora_name(fn):
+            items.append({"name": fn, "size_mb": round(os.path.getsize(os.path.join(d, fn)) / 1e6, 1)})
+    return items
+
+
+def _lora_add(source: str) -> list:
+    """Add a LoRA to the library from a URL (Civitai/HF/direct) or a local file path.
+    Returns the updated list; raises ValueError with a user-facing message on failure."""
+    import shutil
+    import urllib.request
+    source = (source or "").strip()
+    if not source:
+        raise ValueError("Give a download URL or a local .safetensors path.")
+    d = _lora_dir()
+    if source.startswith(("http://", "https://")):
+        url = source
+        if "civitai.com" in url and "token=" not in url and os.environ.get("CIVITAI_API_TOKEN"):
+            url += ("&" if "?" in url else "?") + "token=" + os.environ["CIVITAI_API_TOKEN"]
+        req = urllib.request.Request(url, headers={"User-Agent": "alis-studio"})
+        import ssl
+        try:  # python.org macOS builds ship without system CAs wired into urllib — use certifi's bundle
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ctx = ssl.create_default_context()
+        try:
+            with urllib.request.urlopen(req, timeout=60, context=ctx) as r:
+                # filename: content-disposition beats the URL tail (Civitai serves opaque URLs).
+                # RFC 6266: prefer plain filename=, fall back to filename*=UTF-8''… (percent-encoded)
+                from urllib.parse import unquote
+                cd = r.headers.get("Content-Disposition") or ""
+                name = star = None
+                for part in cd.split(";"):
+                    part = part.strip()
+                    if part.startswith("filename*="):
+                        star = unquote(part.split("''", 1)[-1].strip().strip('"'))
+                    elif part.startswith("filename="):
+                        name = part[len("filename="):].strip().strip('"').strip("'")
+                name = name or star
+                if not name:
+                    name = os.path.basename(url.split("?")[0]) or "lora.safetensors"
+                if not name.endswith(".safetensors"):
+                    name += ".safetensors"
+                name = "".join(c for c in name if c.isalnum() or c in "-_. ") or "lora.safetensors"
+                tmp = os.path.join(d, "." + name + ".part")
+                with open(tmp, "wb") as f:
+                    shutil.copyfileobj(r, f, length=1 << 20)
+                os.replace(tmp, os.path.join(d, name))
+        except ValueError:
+            raise
+        except Exception as e:
+            msg = str(e)
+            if "401" in msg or "403" in msg:
+                raise ValueError("This download needs a Civitai login — create a free API key at "
+                                 "civitai.com/user/account and start the app with CIVITAI_API_TOKEN set.") from None
+            raise ValueError(f"Couldn't download the LoRA: {msg}") from None
+    else:
+        src = os.path.expanduser(source)
+        if not os.path.isfile(src) or not src.endswith(".safetensors"):
+            raise ValueError("Not a .safetensors file: " + source)
+        shutil.copy2(src, os.path.join(d, os.path.basename(src)))
+    return _lora_list()
+
+
+def _resolve_loras(params) -> None:
+    """Rewrite params['loras'] from UI entries [{'name','scale'}] to backend entries
+    [{'path': <abs library path>, 'scale': float}], validating names against the library."""
+    entries = params.get("loras")
+    if not entries:
+        params.pop("loras", None)
+        return
+    d = _lora_dir()
+    resolved = []
+    for e in entries:
+        name = (e or {}).get("name", "")
+        if not _safe_lora_name(name):
+            raise ValueError(f"Unknown LoRA: {name!r}")
+        path = os.path.join(d, name)
+        if not os.path.isfile(path):
+            raise ValueError(f"LoRA not in the library anymore: {name}")
+        try:
+            scale = float(e.get("scale", 1.0))
+        except (TypeError, ValueError):
+            scale = 1.0
+        resolved.append({"path": path, "scale": max(0.0, min(2.0, scale))})
+    params["loras"] = resolved
+
+
 def _gallery_write(im, gid, ts, prompt, meta) -> str:
     """The one writer: persist a single image + its metadata json to the gallery. Returns the id."""
     d = _gallery_dir()
-    im.save(os.path.join(d, gid + ".png"))
+    record = {"id": gid, "prompt": prompt, "ts": ts, **meta}
+    try:  # embed the full recipe in the PNG itself (tEXt "alis") — survives export/sharing,
+        from PIL.PngImagePlugin import PngInfo  # like ComfyUI's workflow-in-PNG reproducibility
+        info = PngInfo()
+        info.add_text("alis", json.dumps(record))
+        im.save(os.path.join(d, gid + ".png"), pnginfo=info)
+    except Exception:
+        im.save(os.path.join(d, gid + ".png"))
     with open(os.path.join(d, gid + ".json"), "w") as f:
-        json.dump({"id": gid, "prompt": prompt, "ts": ts, **meta}, f)
+        json.dump(record, f)
     return gid
 
 
@@ -312,6 +424,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, "application/json", json.dumps(_catalog()).encode())
         elif path == "/api/gallery":
             self._send(200, "application/json", json.dumps({"items": _gallery_list()}).encode())
+        elif path == "/api/loras":
+            self._send(200, "application/json", json.dumps({"items": _lora_list()}).encode())
         elif path.startswith("/api/gallery/") and path.endswith(".png"):
             gid = path[len("/api/gallery/"):-4]
             if _safe_id(gid):
@@ -343,7 +457,8 @@ class Handler(BaseHTTPRequestHandler):
             _CANCEL.set()
             self._send(200, "application/json", b'{"ok":true}')
             return
-        if self.path not in ("/api/generate", "/api/upscale", "/api/download", "/api/delete", "/api/enhance", "/api/gallery/delete"):
+        if self.path not in ("/api/generate", "/api/upscale", "/api/download", "/api/delete", "/api/enhance",
+                             "/api/gallery/delete", "/api/loras/add", "/api/loras/delete"):
             self._send(404, "text/plain", b"not found")
             return
         try:
@@ -357,6 +472,20 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/generate":
             self._generate(req)
+        elif self.path == "/api/loras/add":
+            try:
+                items = _lora_add(str(req.get("source", "")))
+                self._send(200, "application/json", json.dumps({"ok": True, "items": items}).encode())
+            except ValueError as e:
+                self._send(200, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
+        elif self.path == "/api/loras/delete":
+            name = str(req.get("name", ""))
+            if _safe_lora_name(name):
+                try:
+                    os.remove(os.path.join(_lora_dir(), name))
+                except OSError:
+                    pass
+            self._send(200, "application/json", json.dumps({"ok": True, "items": _lora_list()}).encode())
         elif self.path == "/api/upscale":
             self._upscale(req)
         elif self.path == "/api/enhance":
@@ -417,6 +546,12 @@ class Handler(BaseHTTPRequestHandler):
                 w = int(params.get("width") or params.get("size") or 1024)
                 h = int(params.get("height") or params.get("size") or 1024)
                 params["width"], params["height"] = w, h
+                # reproducibility snapshot: the UI-facing settings (LoRAs still by library name,
+                # no image payloads) — saved with each gallery item so "Restore settings" can rebuild
+                ui_params = {k: v for k, v in params.items()
+                             if k not in ("init_image", "image_path") and not isinstance(v, (bytes,))}
+                had_image = bool(params.get("init_image"))
+                _resolve_loras(params)                 # [{'name','scale'}] → validated [{'path','scale'}]
                 img_tmp = _stash_input_image(params)   # img2img: decode uploaded image → params["image_path"]
                 t0 = time.time()
 
@@ -437,7 +572,10 @@ class Handler(BaseHTTPRequestHandler):
                 ow, oh = (imgs[0].width, imgs[0].height) if imgs else (w, h)
                 meta = {"model": backend.label, "width": ow, "height": oh,
                         "steps": int(params.get("steps", 8)), "seed": int(params.get("seed", 0)),
-                        "seconds": round(time.time() - t0, 1)}
+                        "seconds": round(time.time() - t0, 1),
+                        # reproducibility: full recipe for "Restore settings" (and PNG embedding)
+                        "model_id": str(req.get("model", "")), "params": ui_params,
+                        "had_image": had_image}
                 try:
                     _gallery_save(imgs, str(req.get("prompt", "")), meta)   # best-effort history
                 except Exception:

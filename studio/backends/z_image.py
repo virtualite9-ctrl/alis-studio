@@ -18,7 +18,8 @@ from __future__ import annotations
 import os
 
 from .base import Backend
-from .mflux_common import _apply_memory_policy, _img2img_args, _img2img_params, _wire_progress
+from .mflux_common import (_apply_memory_policy, _img2img_args, _img2img_params, _lora_args,
+                           _lora_params, _lora_sig, _wire_progress)
 
 class ZImageTurboBackend(Backend):
     """Z-Image-Turbo (open, Apache-2.0) via mflux — downloads on first use, no HF gating.
@@ -64,6 +65,7 @@ class ZImageTurboBackend(Backend):
          "default": "", "enabled": False,
          "hint": "Turbo runs without guidance, so a negative prompt has no effect."},
         *_img2img_params(),
+        *_lora_params(),
     ]
 
     @classmethod
@@ -77,13 +79,15 @@ class ZImageTurboBackend(Backend):
     def __init__(self):
         self._model = None
         self._variant = None
+        self._loras = ()   # LoRA signature of the cached model — mflux fuses LoRA at construction
 
-    def _get(self, variant):
+    def _get(self, variant, params=None):
         import gc
         import mlx.core as mx
         from mflux.models.common.config import ModelConfig
         from mflux.models.z_image.variants.z_image import ZImage
-        if self._model is None or self._variant != variant:
+        loras = _lora_sig(params or {})
+        if self._model is None or self._variant != variant or self._loras != loras:
             self._model, self._variant = None, None
             gc.collect()
             mx.clear_cache()
@@ -91,9 +95,11 @@ class ZImageTurboBackend(Backend):
             if variant not in builds:   # never substitute silently — the user would get (and cache) the wrong build
                 raise ValueError(f"Unknown build '{variant}' for {self.label} — expected one of: {', '.join(builds)}.")
             model_path, quantize = builds[variant]
+            lora_paths, lora_scales = _lora_args(params or {})
             try:
                 self._model = ZImage(model_config=ModelConfig.z_image_turbo(),
-                                     quantize=quantize, model_path=model_path)
+                                     quantize=quantize, model_path=model_path,
+                                     lora_paths=lora_paths, lora_scales=lora_scales)
             except Exception as e:  # pre-quant builds live in community repos — guide, don't traceback
                 m = str(e).lower()
                 if model_path and any(k in m for k in ("not found", "404", "401", "403",
@@ -104,6 +110,7 @@ class ZImageTurboBackend(Backend):
                     ) from None
                 raise
             self._variant = variant
+            self._loras = loras
             if model_path and "/" in model_path and not os.path.exists(model_path):
                 try:  # mflux never fetches the repo's root config.json, but that's the file the Hub
                     from huggingface_hub import hf_hub_download  # counts — touch it so downloads register
@@ -113,10 +120,12 @@ class ZImageTurboBackend(Backend):
         return self._model
 
     def will_load(self, variant):
+        # a LoRA-set change also reloads, but that happens inside generate (params aren't available
+        # here); it's a seconds-long fuse, not a download — no loading banner needed
         return self._model is None or self._variant != variant
 
     def generate(self, *, prompt, variant, params, step_callback):
-        model = self._get(variant)
+        model = self._get(variant, params)
         w, h = int(params.get("width", 1024)), int(params.get("height", 1024))
         _apply_memory_policy(model, w, h)
         img_path, strength = _img2img_args(params)

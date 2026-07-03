@@ -130,3 +130,40 @@ def _img2img_args(params):
     except (TypeError, ValueError):
         strength = 0.6
     return path, strength
+
+
+def _lora_params():
+    """The LoRA control. The UI renders type 'loras' as the LoRA library (checkbox + scale per
+    entry, add-by-URL/path); the server validates the picked names against the library directory
+    and rewrites params['loras'] to [{'path': <abs path>, 'scale': float}, ...]."""
+    return [
+        {"key": "loras", "label": "LoRA", "type": "loras", "group": "LoRA",
+         "hint": "Style/subject adapters (Civitai etc.) applied on top of the model. "
+                 "Changing the set reloads the model."},
+    ]
+
+
+def _lora_args(params):
+    """(lora_paths, lora_scales) for an mflux constructor, or (None, None). Server-resolved."""
+    loras = params.get("loras") or []
+    paths = [entry.get("path") for entry in loras if entry.get("path")]
+    if not paths:
+        return None, None
+    scales = []
+    for entry in loras:
+        if not entry.get("path"):
+            continue
+        try:
+            scales.append(float(entry.get("scale", 1.0)))
+        except (TypeError, ValueError):
+            scales.append(1.0)
+    return paths, scales
+
+
+def _lora_sig(params):
+    """Hashable signature of the LoRA selection — part of the model-cache key (mflux applies LoRA
+    at construction, so a different set means a reload)."""
+    paths, scales = _lora_args(params)
+    if not paths:
+        return ()
+    return tuple(zip(paths, scales))
