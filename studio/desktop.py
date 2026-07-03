@@ -15,6 +15,51 @@ from . import __version__
 from .server import start_http
 
 
+_ABOUT_TARGET = None   # strong ref — ObjC menu targets are weakly referenced
+
+
+def _app_icon():
+    """The bundle icon at runtime: sys.executable lives in Contents/Resources/python/bin/."""
+    import sys
+    p = os.path.abspath(os.path.join(os.path.dirname(sys.executable), "..", "..", "AppIcon.icns"))
+    if os.path.isfile(p):
+        from AppKit import NSImage
+        return NSImage.alloc().initWithContentsOfFile_(p)
+    return None
+
+
+def _fix_identity():
+    """The process is the bundled python3, so the standard About panel (and dock icon) show the
+    interpreter's identity, not the app's. Retarget the About item to a proper panel and set the
+    dock icon explicitly. Main thread only."""
+    global _ABOUT_TARGET
+    from AppKit import NSApplication, NSObject
+    icon = _app_icon()
+    nsapp = NSApplication.sharedApplication()
+    if icon is not None:
+        nsapp.setApplicationIconImage_(icon)
+
+    if _ABOUT_TARGET is None:   # the ObjC class may be defined only ONCE per process
+        class _AlisAbout(NSObject):
+            def showAbout_(self, sender):
+                ic = _app_icon()
+                opts = {"ApplicationName": "Alis Studio", "ApplicationVersion": __version__,
+                        "Version": "", "Copyright": "MIT · github.com/avlp12/alis-studio"}
+                if ic is not None:
+                    opts["ApplicationIcon"] = ic
+                NSApplication.sharedApplication().orderFrontStandardAboutPanelWithOptions_(opts)
+
+        _ABOUT_TARGET = _AlisAbout.alloc().init()
+    app_menu = nsapp.mainMenu().itemAtIndex_(0).submenu()
+    for i in range(app_menu.numberOfItems()):
+        it = app_menu.itemAtIndex_(i)
+        if "about" in str(it.title() or "").lower():
+            it.setTitle_("About Alis Studio")
+            it.setTarget_(_ABOUT_TARGET)
+            it.setAction_("showAbout:")
+            break
+
+
 def _nativize(window):
     """macOS: unified-toolbar window chrome. Best-effort — any failure leaves the stock window.
     NSWindow may only be mutated on the main thread; events.shown fires off it, so dispatch."""
@@ -30,6 +75,14 @@ def _nativize(window):
                 ns.setStyleMask_(ns.styleMask() | (1 << 15))     # NSWindowStyleMaskFullSizeContentView
             except Exception as e:
                 print(f"[alis] native titlebar styling skipped: {e!r}")
+            def fix_id():
+                try:
+                    _fix_identity()
+                except Exception as e:
+                    print(f"[alis] app-identity fix skipped: {e!r}")
+            fix_id()
+            AppHelper.callLater(1.5, fix_id)   # pywebview may rebuild the menubar after shown — re-assert
+            AppHelper.callLater(4.0, fix_id)
 
         AppHelper.callAfter(apply)
     except Exception as e:
