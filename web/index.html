@@ -30,7 +30,9 @@ button{font-family:inherit;cursor:pointer}
 .top{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:0.5px solid var(--border);background:var(--surface-2);flex:none;z-index:5}
 /* --- native-app feel (v0.8.2) --- */
 body{user-select:none;-webkit-user-select:none;cursor:default}   /* chrome is not selectable text */
-input,textarea,[contenteditable]{user-select:text;-webkit-user-select:text;cursor:text}
+input,textarea,[contenteditable]{user-select:text;-webkit-user-select:text}
+input[type=text],input[type=number],input[type=search],textarea,[contenteditable]{cursor:text}
+input[type=range],input[type=checkbox]{cursor:pointer}
 button,select,a,.ap,.edsw,.edsz,.edthumb,.mpr,.gcard img{cursor:pointer}
 :focus-visible{outline:2px solid color-mix(in srgb,var(--clay) 60%,transparent);outline-offset:2px;border-radius:4px}
 .gen:active,.qbtn:active,.iconbtn:active,.edtool:active,.sq:active,.pill:active,.gbtn:active,.edsw:active,.edsz:active{transform:scale(.96)}
@@ -133,7 +135,7 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .lbside{width:320px;padding:4px 4px 4px 0;display:flex;flex-direction:column;gap:10px;min-height:0}
 .lblab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .lbprompt{font-size:13px;color:var(--text);line-height:1.5;flex:1;min-height:120px;resize:none;border:1px solid var(--muted);border-radius:9px;padding:10px 11px;background:var(--surface-1);font-family:inherit;outline:none}
-.lbprompt:focus{border-color:var(--clay)}
+.lbprompt:focus{border-color:var(--clay);outline:none}   /* the clay border IS the focus indicator — no double ring */
 .lbmeta{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .lbacts{display:flex;gap:8px}
 .iconbtn{width:34px;height:34px;border:1px solid var(--muted);border-radius:9px;background:transparent;color:var(--text-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
