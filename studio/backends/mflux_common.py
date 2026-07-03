@@ -130,3 +130,66 @@ def _img2img_args(params):
     except (TypeError, ValueError):
         strength = 0.6
     return path, strength
+
+
+def _lora_params():
+    """The LoRA control. The UI renders type 'loras' as the LoRA library (checkbox + scale per
+    entry, add-by-URL/path); the server validates the picked names against the library directory
+    and rewrites params['loras'] to [{'path': <abs path>, 'scale': float}, ...]."""
+    return [
+        {"key": "loras", "label": "LoRA", "type": "loras", "group": "LoRA",
+         "hint": "Style/subject adapters applied on top of the model — pick ones made for THIS "
+                 "model family. On Civitai copy the Download button's link (not the page URL). "
+                 "Changing the set re-fuses the model (a short pause before the first step)."},
+    ]
+
+
+def _lora_args(params):
+    """(lora_paths, lora_scales) for an mflux constructor, or (None, None). Server-resolved."""
+    loras = params.get("loras") or []
+    paths = [entry.get("path") for entry in loras if entry.get("path")]
+    if not paths:
+        return None, None
+    scales = []
+    for entry in loras:
+        if not entry.get("path"):
+            continue
+        try:
+            scales.append(float(entry.get("scale", 1.0)))
+        except (TypeError, ValueError):
+            scales.append(1.0)
+    return paths, scales
+
+
+def _lora_sig(params):
+    """Hashable signature of the LoRA selection — part of the model-cache key (mflux applies LoRA
+    at construction, so a different set means a reload). NOTE: only meaningful AFTER the server's
+    _resolve_loras rewrote library names to paths."""
+    paths, scales = _lora_args(params)
+    if not paths:
+        return ()
+    return tuple(zip(paths, scales))
+
+
+def _construct_checking_lora(builder, lora_paths):
+    """Run a model constructor; when LoRAs are requested, capture mflux's fuse log and FAIL LOUDLY
+    if any LoRA matched 0 keys — mflux silently no-ops on a wrong-base file (e.g. a FLUX LoRA on
+    Z-Image), which would otherwise look like "LoRA does nothing". The captured log is re-printed
+    so server logs keep mflux's own output."""
+    if not lora_paths:
+        return builder()
+    import contextlib
+    import io
+    import re
+    import sys
+    buf = io.StringIO()
+    with contextlib.redirect_stdout(buf):
+        model = builder()
+    text = buf.getvalue()
+    sys.stdout.write(text)
+    for m in re.finditer(r"\((\d+)/(\d+) keys matched\)", text):
+        if m.group(1) == "0":
+            raise ValueError("A selected LoRA didn't match this model (0 keys fused) — it's probably "
+                             "made for a different base model. Uncheck it, or switch to the model it "
+                             "was trained for.")
+    return model

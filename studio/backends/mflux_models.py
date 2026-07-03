@@ -9,7 +9,8 @@ by contrast, ships explicit download management (it uses our own HTTP-bridge dow
 from __future__ import annotations
 
 from .base import Backend
-from .mflux_common import _apply_memory_policy, _img2img_args, _img2img_params, _wire_progress
+from .mflux_common import (_apply_memory_policy, _construct_checking_lora, _img2img_args,
+                           _img2img_params, _lora_args, _lora_params, _lora_sig, _wire_progress)
 
 _QUANT = {"8bit": 8, "4bit": 4, "bf16": None}
 
@@ -32,6 +33,7 @@ def _flux_params(*, default_steps, max_steps, guidance_default, guidance_fixed, 
          "default": "", "enabled": negative,
          **({} if negative else {"hint": "schnell runs without guidance, so a negative prompt has no effect."})},
         *_img2img_params(),
+        *_lora_params(),
     ]
 
 
@@ -54,17 +56,26 @@ class _MfluxFlux(Backend):
     def __init__(self):
         self._model = None
         self._variant = None
+        self._loras = ()   # LoRA signature of the cached model (mflux fuses LoRA at construction)
 
-    def _get(self, variant):
+    def _get(self, variant, params=None):
         import gc
         import mlx.core as mx
         from mflux.models.flux.variants.txt2img.flux import Flux1
-        if self._model is None or self._variant != variant:
+        loras = _lora_sig(params or {})
+        if self._model is None or self._variant != variant or self._loras != loras:
             self._model, self._variant = None, None
             gc.collect()
             mx.clear_cache()
+            lora_paths, lora_scales = _lora_args(params or {})
             try:
-                self._model = Flux1.from_name(self.mflux_name, quantize=_QUANT.get(variant, 8))
+                # NOT Flux1.from_name — that thin factory has no lora kwargs; construct directly
+                from mflux.models.common.config import ModelConfig
+                self._model = _construct_checking_lora(
+                    lambda: Flux1(model_config=ModelConfig.from_name(model_name=self.mflux_name, base_model=None),
+                                  quantize=_QUANT.get(variant, 8),
+                                  lora_paths=lora_paths, lora_scales=lora_scales),
+                    lora_paths)
             except Exception as e:  # FLUX repos are gated — give an actionable message, not a traceback
                 m = str(e).lower()
                 if any(k in m for k in ("gated", "403", "restricted", "authorized", "awaiting")):
@@ -74,13 +85,14 @@ class _MfluxFlux(Backend):
                     ) from None
                 raise
             self._variant = variant
+            self._loras = loras
         return self._model
 
     def will_load(self, variant):
         return self._model is None or self._variant != variant
 
     def generate(self, *, prompt, variant, params, step_callback):
-        model = self._get(variant)
+        model = self._get(variant, params)
         w, h = int(params.get("width", 1024)), int(params.get("height", 1024))
         _apply_memory_policy(model, w, h)
         neg = (params.get("negative") or "").strip() or None
@@ -143,24 +155,31 @@ class QwenImageBackend(Backend):
     def __init__(self):
         self._model = None
         self._variant = None
+        self._loras = ()
 
-    def _get(self, variant):
+    def _get(self, variant, params=None):
         import gc
         import mlx.core as mx
         from mflux.models.qwen.variants.txt2img.qwen_image import QwenImage
-        if self._model is None or self._variant != variant:
+        loras = _lora_sig(params or {})
+        if self._model is None or self._variant != variant or self._loras != loras:
             self._model, self._variant = None, None
             gc.collect()
             mx.clear_cache()
-            self._model = QwenImage(quantize=_QUANT.get(variant, 8))
+            lora_paths, lora_scales = _lora_args(params or {})
+            self._model = _construct_checking_lora(
+                lambda: QwenImage(quantize=_QUANT.get(variant, 8),
+                                  lora_paths=lora_paths, lora_scales=lora_scales),
+                lora_paths)
             self._variant = variant
+            self._loras = loras
         return self._model
 
     def will_load(self, variant):
         return self._model is None or self._variant != variant
 
     def generate(self, *, prompt, variant, params, step_callback):
-        model = self._get(variant)
+        model = self._get(variant, params)
         w, h = int(params.get("width", 1024)), int(params.get("height", 1024))
         _apply_memory_policy(model, w, h)
         neg = (params.get("negative") or "").strip() or None

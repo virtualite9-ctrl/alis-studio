@@ -14,7 +14,8 @@ deliberately not exposed. 8-bit peaks ~39 GB, so this backend needs a roomy Mac 
 from __future__ import annotations
 
 from .base import Backend
-from .mflux_common import _apply_memory_policy, _wire_progress
+from .mflux_common import (_apply_memory_policy, _construct_checking_lora, _lora_args,
+                           _lora_params, _lora_sig, _wire_progress)
 
 _QUANT = {"8bit": 8, "bf16": None}
 
@@ -40,6 +41,7 @@ class QwenImageEditBackend(Backend):
          "min": 1, "max": 10, "step": 0.5, "default": 4.0,
          "hint": "How strongly to follow the edit instruction."},
         {"key": "negative", "label": "Negative prompt", "type": "text", "group": "Advanced", "default": ""},
+        *_lora_params(),
     ]
 
     @classmethod
@@ -53,28 +55,35 @@ class QwenImageEditBackend(Backend):
     def __init__(self):
         self._model = None
         self._variant = None
+        self._loras = ()
 
     def will_load(self, variant):
         return self._model is None or self._variant != variant
 
-    def _get(self, variant):
+    def _get(self, variant, params=None):
         import gc
         import mlx.core as mx
         from mflux.models.common.config import ModelConfig
         from mflux.models.qwen.variants.edit.qwen_image_edit import QwenImageEdit
-        if self._model is None or self._variant != variant:
+        loras = _lora_sig(params or {})
+        if self._model is None or self._variant != variant or self._loras != loras:
             self._model, self._variant = None, None
             gc.collect()
             mx.clear_cache()
-            self._model = QwenImageEdit(quantize=_QUANT.get(variant, 8), model_config=ModelConfig.qwen_image_edit())
+            lora_paths, lora_scales = _lora_args(params or {})
+            self._model = _construct_checking_lora(
+                lambda: QwenImageEdit(quantize=_QUANT.get(variant, 8), model_config=ModelConfig.qwen_image_edit(),
+                                      lora_paths=lora_paths, lora_scales=lora_scales),
+                lora_paths)
             self._variant = variant
+            self._loras = loras
         return self._model
 
     def generate(self, *, prompt, variant, params, step_callback):
         img_path = params.get("image_path")   # set by the server from the uploaded init_image
         if not img_path:
             raise ValueError("Attach an image to edit — Qwen-Image Edit transforms an existing image.")
-        model = self._get(variant)
+        model = self._get(variant, params)
         try:  # mflux decodes the edit at ~1 MP (≈1024²) regardless of input size, so base the VAE-tiling
             import math  # decision on that normalized size — not the raw input — to match the real decode
             from PIL import Image
