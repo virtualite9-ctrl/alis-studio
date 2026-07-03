@@ -8,6 +8,21 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.8.2] — 2026-07-03
+
+### Changed
+- **The app now looks like a Mac app, not a wrapped web page.** In the native window: the title
+  bar is transparent and hidden — the traffic lights sit directly on the app's own top bar
+  (unified-toolbar chrome, applied on the main thread), the top bar's passive areas drag the
+  window, a native **View** menu (Toggle Gallery / Edit an Image / Focus Prompt) appears in the
+  menu bar, the browser context menu is suppressed on chrome (kept for text fields and images),
+  and the window dims its chrome when inactive.
+- Web-tea removed everywhere (browser too): UI chrome is no longer selectable text (inputs stay
+  selectable), cursors are native (pointer on controls, default elsewhere), focus rings are the
+  app's clay accent instead of the browser default, buttons have a subtle press state, and
+  scrollbars are thin macOS-style overlays.
+- **⌘G** toggles the gallery; **⌘Enter** still generates.
+
 ## [0.8.1] — 2026-07-03
 
 ### Added
