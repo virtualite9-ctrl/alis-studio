@@ -1022,9 +1022,11 @@ async function submitBody(body,p){   // one streamed /api/generate run; queued j
       while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(line.trim())handle(JSON.parse(line),p);}}
   }catch(e){if(e.name!=="AbortError")showErr("Generation failed: "+e.message);}
   finally{aborter=null;setBusy(false);clearInterval(timer);progress.classList.remove("show");
-    if(QUEUE.length){const j=QUEUE.shift();updateQueueChip();submitBody(j.body,j.prompt);}}   // run the next queued job
+    if(QUEUE.length){const j=QUEUE.shift();updateQueueChip();
+      submitBody(j.body,j.prompt).catch(e=>showErr("Queued job failed: "+e.message));}}   // never drop the rest of the queue silently
 }
 function queueCurrent(){   // snapshot the CURRENT prompt+model+settings as the next job
+  if(!busy)return;   // the button only shows while busy, but keep the invariant explicit
   const p=prompt.value.trim();
   if(!p){showErr("Enter a prompt to queue.");return;}
   if(AUTOSEED&&SEEDCTL)SEEDCTL.roll();   // each queued job gets its own seed when auto-seed is on
