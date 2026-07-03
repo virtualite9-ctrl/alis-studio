@@ -136,6 +136,7 @@ automatically (two pipelines won't fit); bigger Macs keep it cached for instant 
 | **CyberRealistic Z** | 4-bit (~5.5 GB, **runs on 16 GB**) · 8-bit (~10 GB, ≥ 24 GB). [Civitai](https://civitai.com/models/2218365) photorealism finetune of Z-Image Turbo by [Cyberdelia](https://civitai.com/user/Cyberdelia) (OpenRAIL-M). Separate weights from the base model. | auto on first use ([mlx build](https://huggingface.co/avlp12/CyberRealistic-Z-Image-Turbo-v4-mflux-4bit)) |
 | **Qwen-Image** | 8-bit, bf16. Apache-2.0, open. (No 4-bit — its ~20B transformer gets grainy below 8-bit.) | auto on first use via mflux (~40 GB) |
 | **Qwen-Image Edit** | 8-bit (needs ≥ 64 GB) · bf16 (≥ 96 GB). Apache-2.0 instruction editing. (No 4-bit — mflux quantizes it to noise.) | auto on first use via mflux (~54 GB) |
+| **FLUX.2 klein 4B** | 4-bit (**runs on 16 GB**) · 8-bit · bf16. BFL's 2026 fast model, ~4 steps, Apache-2.0, **ungated**. img2img + LoRA. | auto on first use via mflux (~15 GB) |
 | **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |
 | **FLUX.1 dev** | 8/4-bit, bf16. Non-commercial, **gated**. | auto on first use via mflux (~24 GB) |
 

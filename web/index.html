@@ -45,6 +45,8 @@ button{font-family:inherit;cursor:pointer}
 .iconbtn{width:34px;height:34px;border:0.5px solid var(--border);border-radius:17px;background:var(--surface);color:var(--text-2);display:inline-flex;align-items:center;justify-content:center}
 .iconbtn:hover{border-color:var(--border-strong)}.iconbtn svg{width:17px;height:17px}.iconbtn.on{color:var(--ok);border-color:var(--border-strong)}
 .gen{height:36px;padding:0 18px;border:none;border-radius:18px;background:var(--clay);color:var(--on-clay);font-size:14px;font-weight:500;display:inline-flex;align-items:center;gap:7px;transition:background .12s}
+.qbtn{height:36px;padding:0 12px;border:1px solid var(--border);border-radius:18px;background:var(--surface);color:var(--text-2);font-size:13px;display:inline-flex;align-items:center;gap:5px;margin-right:8px;cursor:pointer}
+.qbtn:hover{border-color:var(--clay);color:var(--clay)}.qbtn svg{width:16px;height:16px}#qcount{font-weight:600;color:var(--clay)}
 .gen:hover{background:var(--clay-hover)}.gen:disabled{opacity:.55;cursor:default}.gen svg{width:16px;height:16px}
 .gen.stop{background:var(--surface-1);color:var(--text);border:0.5px solid var(--border-strong)}.gen.stop:hover{background:var(--surface)}
 .panel{border:0.5px solid var(--border);border-radius:14px;background:var(--surface-2);padding:14px 15px}
@@ -225,6 +227,7 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
         <button class="iconbtn on" id="safety" aria-label="NSFW safety filter on" title="NSFW safety filter: on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></button>
         <button class="enhbtn" id="enhbtn" title="Rewrite the prompt in English with a local model"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/></svg>Enhance</button>
         <span style="flex:1"></span>
+        <button class="qbtn" id="queueBtn" style="display:none" title="Queue this prompt to run next (Stop clears the queue)" aria-label="Queue this prompt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 13v6M16 16h6"/></svg><span id="qcount"></span></button>
         <button class="gen" id="gen" disabled><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/></svg>Generate</button>
       </div>
     </div>
@@ -274,6 +277,7 @@ let BACKENDS=[],CATALOG={backends:[],disk_gb:0},PV={},current="",safetyOn=true,b
 let IMGSET={};   // programmatic setters for "image" params (key → set(uri)), rebuilt by renderParams — lets paste/drop feed the img2img input
 let LORAS=[];    // the LoRA library (/api/loras), shared by every model's "loras" control
 let SEEDCTL=null;   // seed control's {roll} — used by auto-seed
+let QUEUE=[];    // queued jobs [{body,prompt}] — run one after another; Stop clears it
 let AUTOSEED=false;try{AUTOSEED=localStorage.getItem("alis_autoseed")==="1";}catch(e){}
 let SYS={ram_gib:0,constrained:false,enhance_available:false,enhance_model:""},enhanceOn=false,galleryOn=false;
 const SVG_DL='<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"/><path d="M7 10l5 5 5-5"/><path d="M12 15V3"/></svg>';
@@ -306,6 +310,7 @@ prompt.addEventListener("input",()=>{prompt.style.height="auto";prompt.style.hei
 prompt.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")generate();});
 safetyBtn.addEventListener("click",()=>{safetyOn=!safetyOn;safetyBtn.classList.toggle("on",safetyOn);safetyBtn.title="NSFW safety filter: "+(safetyOn?"on":"off");});
 gen.addEventListener("click",()=>{busy?stopGen():generate();});
+$("#queueBtn").addEventListener("click",queueCurrent);
 $("#enhbtn").addEventListener("click",doEnhance);
 $("#galleryBtn").addEventListener("click",()=>toggleGallery());
 function toggleGallery(on){
@@ -981,8 +986,8 @@ function control(p,pre){
   return c;
 }
 
-function setBusy(b){busy=b;if(b){gen.disabled=false;gen.classList.add("stop");gen.innerHTML=SVG_STOP+"Stop";}else{gen.classList.remove("stop");gen.innerHTML=SVG_GEN+"Generate";reconcile();}}
-function stopGen(){if(!busy)return;pstep.textContent="Stopping…";fetch("/api/cancel",{method:"POST"}).catch(()=>{});if(aborter)aborter.abort();}
+function setBusy(b){busy=b;if(b){gen.disabled=false;gen.classList.add("stop");gen.innerHTML=SVG_STOP+"Stop";}else{gen.classList.remove("stop");gen.innerHTML=SVG_GEN+"Generate";reconcile();}updateQueueChip();}
+function stopGen(){if(!busy)return;QUEUE=[];updateQueueChip();pstep.textContent="Stopping…";fetch("/api/cancel",{method:"POST"}).catch(()=>{});if(aborter)aborter.abort();}
 async function generate(){
   if(busy)return;const p=prompt.value.trim();errBox.classList.remove("show");
   if(!p){showErr("Enter a prompt.");return;}
@@ -1002,6 +1007,9 @@ async function runGenerate(p,allowLowRam){
   if(AUTOSEED&&SEEDCTL)SEEDCTL.roll();   // fresh seed per run (the input reflects what was used)
   const body={prompt:p,model:current,safety:safetyOn,params:{...PV}};
   if(allowLowRam)body.allow_low_ram=true;
+  await submitBody(body,p);
+}
+async function submitBody(body,p){   // one streamed /api/generate run; queued jobs reuse this
   setBusy(true);empty.style.display="none";
   progress.classList.add("show");barfill.style.width="0%";pstep.textContent="Loading model…";ptime.textContent="";
   t0=Date.now();clearInterval(timer);timer=setInterval(()=>ptime.textContent=fmt((Date.now()-t0)/1000)+"s",100);
@@ -1013,7 +1021,22 @@ async function runGenerate(p,allowLowRam){
     while(true){const{value,done}=await reader.read();if(done)break;buf+=dec.decode(value,{stream:true});let nl;
       while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(line.trim())handle(JSON.parse(line),p);}}
   }catch(e){if(e.name!=="AbortError")showErr("Generation failed: "+e.message);}
-  finally{aborter=null;setBusy(false);clearInterval(timer);progress.classList.remove("show");}
+  finally{aborter=null;setBusy(false);clearInterval(timer);progress.classList.remove("show");
+    if(QUEUE.length){const j=QUEUE.shift();updateQueueChip();submitBody(j.body,j.prompt);}}   // run the next queued job
+}
+function queueCurrent(){   // snapshot the CURRENT prompt+model+settings as the next job
+  const p=prompt.value.trim();
+  if(!p){showErr("Enter a prompt to queue.");return;}
+  if(AUTOSEED&&SEEDCTL)SEEDCTL.roll();   // each queued job gets its own seed when auto-seed is on
+  const body={prompt:p,model:current,safety:safetyOn,
+              params:{...PV,loras:(PV.loras||[]).map(e=>({...e}))}};   // deep-ish copy: later UI edits must not mutate the job
+  QUEUE.push({body,prompt:p});
+  updateQueueChip();
+  pstep.textContent="Queued ("+QUEUE.length+" waiting)";
+}
+function updateQueueChip(){
+  const b=$("#queueBtn");b.style.display=busy?"":"none";
+  $("#qcount").textContent=QUEUE.length?String(QUEUE.length):"";
 }
 function handle(ev,p){
   if(ev.type==="status"){pstep.textContent=ev.message;}
