@@ -20,6 +20,17 @@ web UI, and the DMG build stamps it into the app bundle.
   - Candidates that didn't make the cut: Moody Pro Mix (no-derivatives license), RedCraft KREA2
     (INT8-ConvRot only, no bf16 source — would double-quantize).
 
+### Changed
+- **Memory honesty across models** (3-lens review): on Macs with ≤ 32 GB, loading a model now frees
+  the one another backend had cached — A/B-ing Z-Image against its finetune used to stack two ~6 GB
+  pipelines and could OOM a 16 GB machine. Stock Z-Image 8-bit/bf16 gained explicit RAM floors
+  (24 / 32 GB — they quantize on the fly from the ~33 GB bf16 repo); CyberRealistic 8-bit wants
+  ≥ 24 GB.
+- An unknown build id now errors instead of silently substituting (and mislabeling) the default
+  build; a failed NSFW-filter load is logged instead of silently passing images through unfiltered.
+- Model backends touch the repo's `config.json` on first download so Hugging Face counts the
+  download (mflux itself never fetches it).
+
 ## [0.7.4] — 2026-07-02
 
 ### Added

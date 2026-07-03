@@ -15,18 +15,10 @@ builds quantize on the fly from the official ``Tongyi-MAI/Z-Image-Turbo`` repo (
 
 from __future__ import annotations
 
+import os
+
 from .base import Backend
 from .mflux_common import _apply_memory_policy, _img2img_args, _img2img_params, _wire_progress
-
-# variant id -> (mflux model_path, quantize).
-# 4-bit: a ready pre-quantized repo (no on-the-fly quantization, light download, 16 GB-friendly).
-# 8-bit/bf16: the official full-precision repo, quantized at load (8) or kept as-is (None=bf16).
-_BUILDS = {
-    "4bit": ("filipstrand/Z-Image-Turbo-mflux-4bit", None),
-    "8bit": (None, 8),
-    "bf16": (None, None),
-}
-
 
 class ZImageTurboBackend(Backend):
     """Z-Image-Turbo (open, Apache-2.0) via mflux — downloads on first use, no HF gating.
@@ -34,17 +26,27 @@ class ZImageTurboBackend(Backend):
     Subclassable: a Z-Image finetune backend (e.g. cyber_z.py) overrides id/label/info/variants and
     BUILDS — everything else (params, loading, img2img, memory policy) is shared."""
 
-    BUILDS = _BUILDS   # variant id -> (mflux model_path, quantize); override in subclasses
+    # variant id -> (mflux model_path, quantize).
+    # 4-bit: a ready pre-quantized repo (no on-the-fly quantization, light download, 16 GB-friendly).
+    # 8-bit/bf16: the official full-precision repo, quantized at load (8) or kept as-is (None=bf16).
+    # Subclasses override this dict; every variants[] id MUST be a BUILDS key (unknown ids raise).
+    BUILDS = {
+        "4bit": ("filipstrand/Z-Image-Turbo-mflux-4bit", None),
+        "8bit": (None, 8),
+        "bf16": (None, None),
+    }
     id = "z-image-turbo"
     label = "Z-Image Turbo"
     min_ram_gib = 16   # 4-bit pipeline ~6 GB resident; 1024² peaks ~8.5 GB with VAE tiling → runs on 16 GB
-    prompt_note = "Understands Korean and other languages natively (Qwen3 text encoder). Distilled — fast at ~9 steps."
+    prompt_note = "The general-purpose base model (Apache-2.0 — the safest license here). Understands Korean natively (Qwen3 encoder); distilled — fast at ~9 steps."
     info = "Apache-2.0 (open) · 4-bit runs on a 16 GB Mac (best at 512–768px) · downloads on first use via mflux"
     # 4-bit is listed first on purpose: it is the default (variants[0]) and the only 16 GB-friendly build.
     variants = [
         {"id": "4bit", "label": "4-bit · ~6 GB · 16 GB-Mac friendly"},
-        {"id": "8bit", "label": "8-bit · ~33 GB download"},
-        {"id": "bf16", "label": "bf16 · full precision, ~33 GB"},
+        # 8-bit/bf16 quantize on the fly from the ~33 GB bf16 repo — the transient full-precision
+        # weights want a roomy Mac, hence the explicit floors
+        {"id": "8bit", "label": "8-bit · ~33 GB download · wants ≥ 24 GB RAM", "min_ram": 24},
+        {"id": "bf16", "label": "bf16 · full precision, ~33 GB · wants ≥ 32 GB RAM", "min_ram": 32},
     ]
     params = [
         {"key": "resolution", "label": "Resolution", "type": "resolution", "group": "Output",
@@ -85,8 +87,10 @@ class ZImageTurboBackend(Backend):
             self._model, self._variant = None, None
             gc.collect()
             mx.clear_cache()
-            builds = type(self).BUILDS
-            model_path, quantize = builds.get(variant, builds[self.variants[0]["id"]])
+            builds = self.BUILDS
+            if variant not in builds:   # never substitute silently — the user would get (and cache) the wrong build
+                raise ValueError(f"Unknown build '{variant}' for {self.label} — expected one of: {', '.join(builds)}.")
+            model_path, quantize = builds[variant]
             try:
                 self._model = ZImage(model_config=ModelConfig.z_image_turbo(),
                                      quantize=quantize, model_path=model_path)
@@ -100,6 +104,12 @@ class ZImageTurboBackend(Backend):
                     ) from None
                 raise
             self._variant = variant
+            if model_path and "/" in model_path and not os.path.exists(model_path):
+                try:  # mflux never fetches the repo's root config.json, but that's the file the Hub
+                    from huggingface_hub import hf_hub_download  # counts — touch it so downloads register
+                    hf_hub_download(model_path, "config.json")
+                except Exception:
+                    pass
         return self._model
 
     def will_load(self, variant):

@@ -29,5 +29,5 @@ class CyberRealisticZBackend(ZImageTurboBackend):
     }
     variants = [
         {"id": "4bit", "label": "4-bit · ~5.5 GB · 16 GB-Mac friendly"},
-        {"id": "8bit", "label": "8-bit · ~10 GB"},
+        {"id": "8bit", "label": "8-bit · ~10 GB · wants ≥ 24 GB RAM", "min_ram": 24},
     ]
