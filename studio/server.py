@@ -265,6 +265,24 @@ def _lora_list() -> list:
     return items
 
 
+def _verify_safetensors(path: str) -> None:
+    """A .safetensors file starts with a uint64 header length + a '{' JSON header. The most common
+    first-timer mistake is pasting a Civitai model-PAGE url — we'd happily save the HTML otherwise,
+    and mflux would later fuse it as a silent no-op."""
+    import struct
+    try:
+        with open(path, "rb") as f:
+            n = struct.unpack("<Q", f.read(8))[0]
+            first = f.read(1)
+        ok = 2 <= n <= 100 * 1024 * 1024 and first == b"{"
+    except Exception:
+        ok = False
+    if not ok:
+        raise ValueError("That file isn't a .safetensors LoRA. On Civitai, copy the link from the "
+                         "Download button (not the page URL); on Hugging Face, use the file's "
+                         "/resolve/ URL.")
+
+
 def _lora_add(source: str) -> list:
     """Add a LoRA to the library from a URL (Civitai/HF/direct) or a local file path.
     Returns the updated list; raises ValueError with a user-facing message on failure."""
@@ -285,6 +303,7 @@ def _lora_add(source: str) -> list:
             ctx = ssl.create_default_context(cafile=certifi.where())
         except Exception:
             ctx = ssl.create_default_context()
+        tmp = None
         try:
             with urllib.request.urlopen(req, timeout=60, context=ctx) as r:
                 # filename: content-disposition beats the URL tail (Civitai serves opaque URLs).
@@ -301,13 +320,36 @@ def _lora_add(source: str) -> list:
                 name = name or star
                 if not name:
                     name = os.path.basename(url.split("?")[0]) or "lora.safetensors"
+                name = "".join(c for c in name if c.isalnum() or c in "-_. ").lstrip(". ") or "lora.safetensors"
                 if not name.endswith(".safetensors"):
                     name += ".safetensors"
-                name = "".join(c for c in name if c.isalnum() or c in "-_. ") or "lora.safetensors"
+                if not _safe_lora_name(name):   # the WRITE path must accept exactly what list/delete accept
+                    raise ValueError(f"Unusable file name from the server: {name!r}")
+                dst = os.path.join(d, name)
+                if os.path.exists(dst):
+                    raise ValueError(f"'{name}' is already in the library — delete it first if you "
+                                     "want to replace it (saved recipes reference LoRAs by name).")
+                cap = 4 * 1024 * 1024 * 1024   # LoRAs are MBs–1.5 GB; anything past 4 GB is not a LoRA
+                cl = r.headers.get("Content-Length")
+                if cl and int(cl) > cap:
+                    raise ValueError(f"That file is {int(cl)/1e9:.1f} GB — too big to be a LoRA.")
                 tmp = os.path.join(d, "." + name + ".part")
+                deadline = time.time() + 30 * 60   # wall-clock cap: timeout=60 only bounds each socket op
+                got = 0
                 with open(tmp, "wb") as f:
-                    shutil.copyfileobj(r, f, length=1 << 20)
-                os.replace(tmp, os.path.join(d, name))
+                    while True:
+                        chunk = r.read(1 << 20)
+                        if not chunk:
+                            break
+                        got += len(chunk)
+                        if got > cap:
+                            raise ValueError("Download exceeded 4 GB — aborted (not a LoRA?).")
+                        if time.time() > deadline:
+                            raise ValueError("Download took over 30 minutes — aborted.")
+                        f.write(chunk)
+                _verify_safetensors(tmp)   # reject HTML/error pages saved as ".safetensors"
+                os.replace(tmp, dst)
+                tmp = None
         except ValueError:
             raise
         except Exception as e:
@@ -316,11 +358,28 @@ def _lora_add(source: str) -> list:
                 raise ValueError("This download needs a Civitai login — create a free API key at "
                                  "civitai.com/user/account and start the app with CIVITAI_API_TOKEN set.") from None
             raise ValueError(f"Couldn't download the LoRA: {msg}") from None
+        finally:
+            if tmp and os.path.exists(tmp):   # no orphaned hidden .part files on any failure
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
     else:
         src = os.path.expanduser(source)
         if not os.path.isfile(src) or not src.endswith(".safetensors"):
             raise ValueError("Not a .safetensors file: " + source)
-        shutil.copy2(src, os.path.join(d, os.path.basename(src)))
+        _verify_safetensors(src)
+        # sanitize like the URL branch — Civitai filenames love parentheses etc.; the library name
+        # must be exactly what list/delete/generate accept
+        name = "".join(c for c in os.path.basename(src) if c.isalnum() or c in "-_. ").lstrip(". ")
+        if not name.endswith(".safetensors"):
+            name += ".safetensors"
+        if not _safe_lora_name(name):
+            raise ValueError(f"Couldn't derive a usable library name from {os.path.basename(src)!r} — rename the file.")
+        dst = os.path.join(d, name)
+        if os.path.exists(dst):
+            raise ValueError(f"'{name}' is already in the library — delete it first to replace it.")
+        shutil.copy2(src, dst)
     return _lora_list()
 
 
@@ -474,7 +533,8 @@ class Handler(BaseHTTPRequestHandler):
             self._generate(req)
         elif self.path == "/api/loras/add":
             try:
-                items = _lora_add(str(req.get("source", "")))
+                with _DLLOCK:   # serialize with other downloads — deterministic .part names
+                    items = _lora_add(str(req.get("source", "")))
                 self._send(200, "application/json", json.dumps({"ok": True, "items": items}).encode())
             except ValueError as e:
                 self._send(200, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
@@ -560,6 +620,8 @@ class Handler(BaseHTTPRequestHandler):
                         safe_emit({"type": "status",
                                    "message": f"Loading {backend.label}… (first use may download weights)"})
                         _free_other_backends(backend)   # constrained Macs: don't stack two pipelines
+                    elif params.get("loras"):   # a changed LoRA set reloads inside generate — say so
+                        safe_emit({"type": "status", "message": "Applying LoRA(s)… (re-fuses the model)"})
                     out = backend.generate(prompt=str(req.get("prompt", "")), variant=variant,
                                            params=params, step_callback=step)
                     if _CANCEL.is_set():  # stopped after the last step, or by a backend that doesn't tick

@@ -18,8 +18,8 @@ from __future__ import annotations
 import os
 
 from .base import Backend
-from .mflux_common import (_apply_memory_policy, _img2img_args, _img2img_params, _lora_args,
-                           _lora_params, _lora_sig, _wire_progress)
+from .mflux_common import (_apply_memory_policy, _construct_checking_lora, _img2img_args,
+                           _img2img_params, _lora_args, _lora_params, _lora_sig, _wire_progress)
 
 class ZImageTurboBackend(Backend):
     """Z-Image-Turbo (open, Apache-2.0) via mflux — downloads on first use, no HF gating.
@@ -97,9 +97,11 @@ class ZImageTurboBackend(Backend):
             model_path, quantize = builds[variant]
             lora_paths, lora_scales = _lora_args(params or {})
             try:
-                self._model = ZImage(model_config=ModelConfig.z_image_turbo(),
-                                     quantize=quantize, model_path=model_path,
-                                     lora_paths=lora_paths, lora_scales=lora_scales)
+                self._model = _construct_checking_lora(
+                    lambda: ZImage(model_config=ModelConfig.z_image_turbo(),
+                                   quantize=quantize, model_path=model_path,
+                                   lora_paths=lora_paths, lora_scales=lora_scales),
+                    lora_paths)
             except Exception as e:  # pre-quant builds live in community repos — guide, don't traceback
                 m = str(e).lower()
                 if model_path and any(k in m for k in ("not found", "404", "401", "403",

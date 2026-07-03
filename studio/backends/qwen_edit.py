@@ -14,7 +14,8 @@ deliberately not exposed. 8-bit peaks ~39 GB, so this backend needs a roomy Mac 
 from __future__ import annotations
 
 from .base import Backend
-from .mflux_common import _apply_memory_policy, _lora_args, _lora_params, _lora_sig, _wire_progress
+from .mflux_common import (_apply_memory_policy, _construct_checking_lora, _lora_args,
+                           _lora_params, _lora_sig, _wire_progress)
 
 _QUANT = {"8bit": 8, "bf16": None}
 
@@ -70,8 +71,10 @@ class QwenImageEditBackend(Backend):
             gc.collect()
             mx.clear_cache()
             lora_paths, lora_scales = _lora_args(params or {})
-            self._model = QwenImageEdit(quantize=_QUANT.get(variant, 8), model_config=ModelConfig.qwen_image_edit(),
-                                        lora_paths=lora_paths, lora_scales=lora_scales)
+            self._model = _construct_checking_lora(
+                lambda: QwenImageEdit(quantize=_QUANT.get(variant, 8), model_config=ModelConfig.qwen_image_edit(),
+                                      lora_paths=lora_paths, lora_scales=lora_scales),
+                lora_paths)
             self._variant = variant
             self._loras = loras
         return self._model

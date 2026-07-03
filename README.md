@@ -85,13 +85,17 @@ too large to ship inside a DMG.
 - **Image-to-image** — every generation model (**Krea 2 Turbo**, Z-Image, Qwen, FLUX) takes an
   optional **Input image** + **Strength**; attach (or just paste) a picture and transform it with
   your prompt.
-- **LoRA** — a shared library for style/subject adapters: add a **Civitai or Hugging Face download
-  URL** (or a local `.safetensors`), check the ones to apply, set per-LoRA strength — multiple LoRAs
-  stack, and Civitai's usual key formats are recognized automatically. Works on Z-Image,
-  CyberRealistic Z, Qwen-Image (+Edit), and FLUX. (Z-Image has the largest LoRA scene on Civitai.)
-- **Restore settings & reproducibility** — every gallery image keeps its full recipe (model, size,
-  steps, seed, LoRAs); one lightbox click restores everything for a re-run or a tweak. The recipe is
-  also embedded in the PNG itself. An **auto-seed** toggle rolls a fresh seed each Generate.
+- **LoRA** — a shared library for style/subject adapters: paste a download URL (on Civitai, the
+  **Download button's link**, not the page URL; on Hugging Face, the file's `/resolve/` URL) or a
+  local `.safetensors`, check the ones to apply, set per-LoRA strength — multiple LoRAs stack, and
+  Civitai's usual key formats are recognized automatically. Works on Z-Image, CyberRealistic Z,
+  Qwen-Image (+Edit), and FLUX — pick LoRAs made for the selected model family. (Z-Image has the
+  largest LoRA scene on Civitai.) Auth-gated Civitai files need `CIVITAI_API_TOKEN` in the
+  environment (free key from civitai.com/user/account) — easiest when running from a terminal.
+- **Restore settings & reproducibility** — every generated image keeps its full recipe (model, size,
+  steps, seed, LoRAs); one lightbox click restores everything for a re-run or a tweak (restoring
+  turns auto-seed off so the saved seed actually applies). The recipe is also embedded in the PNG
+  itself. An **auto-seed** toggle rolls a fresh seed each Generate.
 - **Instruction editing** — **Qwen-Image Edit** (Apache-2.0) follows an edit instruction ("make the
   hat red", understands Korean); the output keeps the input's aspect ratio, normalized to ~1 MP
   (≈1024²). Offered in 8-bit / bf16; it's a large model (~54 GB download, **≥ 64 GB** for 8-bit,

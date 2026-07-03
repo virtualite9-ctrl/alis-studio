@@ -354,8 +354,8 @@ function openLightbox(it){
   $("#lbMeta").textContent=(it.model||"")+" · "+it.width+"×"+it.height+(it.steps?(" · "+it.steps+" steps"):"")+" · seed "+it.seed;
   const lb=$("#lightbox");lb.classList.add("show");
   $("#lbUse").onclick=()=>usePrompt($("#lbPrompt").value);
-  const rst=$("#lbRestore");
-  if(it.model_id&&it.params&&buildOf(it.model_id)){rst.style.display="";
+  const rst=$("#lbRestore"),rb=it.model_id&&it.params&&buildOf(it.model_id);
+  if(rb&&rb.installed){rst.style.display="";   // never a silent gigabyte download via Restore→Generate
     rst.onclick=()=>{restoreSettings(it);lb.classList.remove("show");toggleGallery(false);};}
   else rst.style.display="none";
   $("#lbCopy").onclick=e=>copyText($("#lbPrompt").value,e.currentTarget);
@@ -760,6 +760,7 @@ function setActive(model,initial){
 
 function restoreSettings(it){   // "Restore settings" from a gallery item: model + params + prompt
   const b=backendOf(it.model_id);if(!b)return;
+  if(AUTOSEED){AUTOSEED=false;try{localStorage.setItem("alis_autoseed","0");}catch(e){}}   // the point is the SAVED seed
   setActive(it.model_id);
   renderParams(b,it.params||{});   // re-render with the saved values (also for a same-backend restore)
   prompt.value=it.prompt||"";prompt.dispatchEvent(new Event("input"));
@@ -844,6 +845,8 @@ function renderParams(b,preset){   // preset: saved params from a gallery item (
   for(const[g,ps]of Object.entries(groups)){paramGroups.appendChild(el("div","sgrp",g));ps.forEach(p=>paramGroups.appendChild(control(p,preset||{})));}
   if(!b.params.some(p=>p.type==="image"))   // say WHY the input-image control is missing, don't just hide it
     paramGroups.appendChild(el("div","mphint","<b>"+b.label+"</b> is text-to-image only. To start from a picture, pick <b>Z-Image</b>, <b>Qwen-Image</b>, or <b>FLUX</b> (Input image + Strength), or open it in <b>Edit</b> (top bar)."));
+  if(!b.params.some(p=>p.type==="loras"))   // same courtesy for LoRA
+    paramGroups.appendChild(el("div","mphint","<b>"+b.label+"</b> (our own MLX port) doesn't take LoRAs — the mflux models (Z-Image, CyberRealistic&nbsp;Z, Qwen, FLUX) do."));
 }
 
 // memory-aware high-res warning: what pixel budget is comfortable for this Mac's RAM
@@ -893,7 +896,9 @@ function control(p,pre){
   }
   if(p.type==="int"||p.type==="float"){
     const step=p.step||(p.type==="float"?0.1:1);
-    const init=(!p.fixed&&pre[p.key]!==undefined)?+pre[p.key]:p.default;PV[p.key]=init;
+    let init=(!p.fixed&&pre[p.key]!==undefined)?+pre[p.key]:p.default;
+    init=Math.min(p.max,Math.max(p.min,init));   // a cross-model restore must not exceed this model's range
+    PV[p.key]=init;
     c.appendChild(el("div","lab","<span>"+p.label+"</span><b class='vo'>"+(p.type==="float"?+init.toFixed(2):init)+"</b>"));
     const r=document.createElement("input");r.type="range";r.min=p.min;r.max=p.max;r.step=step;r.value=init;if(p.fixed)r.disabled=true;
     r.oninput=()=>{const v=+r.value;PV[p.key]=v;c.querySelector(".vo").textContent=p.type==="float"?+v.toFixed(2):v;};
@@ -913,9 +918,9 @@ function control(p,pre){
     const roll=()=>{const s=Math.floor(Math.random()*1e9);inp.value=s;PV.seed=s;};
     SEEDCTL={roll};   // runGenerate rolls this when auto-seed is on
     const dice=el("button","sq",'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><rect x="3" y="3" width="18" height="18" rx="3"/><circle cx="8.5" cy="8.5" r="1.3" fill="currentColor"/><circle cx="15.5" cy="15.5" r="1.3" fill="currentColor"/><circle cx="12" cy="12" r="1.3" fill="currentColor"/></svg>');
-    dice.title="Randomize seed once";dice.onclick=roll;
+    dice.title="Randomize seed once";dice.setAttribute("aria-label","Randomize seed once");dice.onclick=roll;
     const auto=el("button","sq"+(AUTOSEED?" on":""),'<svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M16 3h5v5"/><path d="M4 20L21 3"/><path d="M21 16v5h-5"/><path d="M15 15l6 6"/><path d="M4 4l5 5"/></svg>');
-    auto.title="New random seed on every Generate";auto.setAttribute("aria-pressed",AUTOSEED);
+    auto.title="New random seed on every Generate";auto.setAttribute("aria-label","Auto-randomize seed each run");auto.setAttribute("aria-pressed",AUTOSEED);
     auto.onclick=()=>{AUTOSEED=!AUTOSEED;auto.classList.toggle("on",AUTOSEED);auto.setAttribute("aria-pressed",AUTOSEED);
       try{localStorage.setItem("alis_autoseed",AUTOSEED?"1":"0");}catch(e){}};
     row.appendChild(inp);row.appendChild(dice);row.appendChild(auto);c.appendChild(row);return c;
@@ -929,8 +934,10 @@ function control(p,pre){
   if(p.type==="loras"){
     // the LoRA library: check entries to apply them (per-LoRA strength), add by URL or local path
     const saved=Array.isArray(pre[p.key])?pre[p.key]:[];
+    const missing=saved.filter(e=>e&&e.name&&!LORAS.some(l=>l.name===e.name)).map(e=>e.name);
+    if(missing.length)showErr("Not restored — no longer in the LoRA library: "+missing.join(", "));
     PV[p.key]=saved.filter(e=>e&&e.name&&LORAS.some(l=>l.name===e.name))
-                   .map(e=>({name:e.name,scale:+e.scale||1}));
+                   .map(e=>({name:e.name,scale:isFinite(+e.scale)?+e.scale:1}));
     const list=el("div","lrlist");
     const rerender=()=>{
       list.innerHTML="";
@@ -948,6 +955,7 @@ function control(p,pre){
           if(r&&r.items){LORAS=r.items;rerender();}};
         row.appendChild(cb);row.appendChild(name);
         if(sel){const sc=document.createElement("input");sc.type="range";sc.min=0;sc.max=2;sc.step=0.05;sc.value=sel.scale;sc.className="lrscale";
+          sc.title="Strength (1 = as trained)";sc.setAttribute("aria-label","LoRA strength");
           const vo=el("b","lrvo",""+(+(+sel.scale).toFixed(2)));
           sc.oninput=()=>{sel.scale=+sc.value;vo.textContent=+(+sc.value).toFixed(2);};
           row.appendChild(sc);row.appendChild(vo);}
@@ -956,7 +964,9 @@ function control(p,pre){
       });};
     rerender();
     const addrow=el("div","lradd");
-    const src=document.createElement("input");src.type="text";src.className="fld";src.placeholder="Civitai/HF download URL, or /path/to/lora.safetensors";
+    const src=document.createElement("input");src.type="text";src.className="fld";
+    src.placeholder="Civitai ‘Download’ button link · HF /resolve/ URL · /path/to/lora.safetensors";
+    src.title="On Civitai: right-click the Download button → copy link. On Hugging Face: the file's /resolve/ URL.";
     const btn=el("button","pill","Add");
     btn.onclick=async()=>{const v=src.value.trim();if(!v)return;btn.disabled=true;btn.textContent="Adding…";
       try{const r=await fetch("/api/loras/add",{method:"POST",headers:{"Content-Type":"application/json"},body:JSON.stringify({source:v})}).then(x=>x.json());
