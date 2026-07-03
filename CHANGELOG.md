@@ -8,6 +8,18 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.7.5] — 2026-07-03
+
+### Added
+- **CyberRealistic Z** — the first community model adopted from **Civitai**: Cyberdelia's
+  photorealism finetune of Z-Image Turbo (v4.0, taken from the creator's own HF mirror,
+  CreativeML OpenRAIL-M). Converted from the ComfyUI single-file checkpoint to the mflux layout
+  (fused-qkv split + key remap, verified key-complete both ways) and re-hosted pre-quantized —
+  **4-bit (~5.5 GB) runs on a 16 GB Mac**, 8-bit (~10 GB) for bigger machines. Same ~9-step /
+  no-CFG / multilingual recipe as Z-Image Turbo, img2img included.
+  - Candidates that didn't make the cut: Moody Pro Mix (no-derivatives license), RedCraft KREA2
+    (INT8-ConvRot only, no bf16 source — would double-quantize).
+
 ## [0.7.4] — 2026-07-02
 
 ### Added

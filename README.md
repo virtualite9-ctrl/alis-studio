@@ -120,6 +120,7 @@ downloads inline, and the previous build is freed when you switch (two big model
 |---|---|---|
 | **Krea 2 Turbo** | 8-bit (14.2 GB) · mixed-4/8 (9.8 GB). 8-step Turbo. Wants ≥ 24 GB RAM. | managed in-app (resumable, with progress) |
 | **Z-Image Turbo** | 4-bit (~6 GB) · 8-bit · bf16. 9-step Turbo, Apache-2.0. **Runs on 16 GB**; multilingual (Qwen3 encoder). | auto on first use via mflux |
+| **CyberRealistic Z** | 4-bit (~5.5 GB, **runs on 16 GB**) · 8-bit (~10 GB). Civitai photorealism finetune of Z-Image Turbo by Cyberdelia (OpenRAIL-M). | auto on first use ([mlx build](https://huggingface.co/avlp12/CyberRealistic-Z-Image-Turbo-v4-mflux-4bit)) |
 | **Qwen-Image** | 8-bit, bf16. Apache-2.0, open. (No 4-bit — its ~20B transformer gets grainy below 8-bit.) | auto on first use via mflux (~40 GB) |
 | **Qwen-Image Edit** | 8-bit (needs ≥ 64 GB) · bf16 (≥ 96 GB). Apache-2.0 instruction editing. (No 4-bit — mflux quantizes it to noise.) | auto on first use via mflux (~54 GB) |
 | **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |

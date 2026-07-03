@@ -29,8 +29,12 @@ _BUILDS = {
 
 
 class ZImageTurboBackend(Backend):
-    """Z-Image-Turbo (open, Apache-2.0) via mflux — downloads on first use, no HF gating."""
+    """Z-Image-Turbo (open, Apache-2.0) via mflux — downloads on first use, no HF gating.
 
+    Subclassable: a Z-Image finetune backend (e.g. cyber_z.py) overrides id/label/info/variants and
+    BUILDS — everything else (params, loading, img2img, memory policy) is shared."""
+
+    BUILDS = _BUILDS   # variant id -> (mflux model_path, quantize); override in subclasses
     id = "z-image-turbo"
     label = "Z-Image Turbo"
     min_ram_gib = 16   # 4-bit pipeline ~6 GB resident; 1024² peaks ~8.5 GB with VAE tiling → runs on 16 GB
@@ -81,17 +85,18 @@ class ZImageTurboBackend(Backend):
             self._model, self._variant = None, None
             gc.collect()
             mx.clear_cache()
-            model_path, quantize = _BUILDS.get(variant, _BUILDS["4bit"])
+            builds = type(self).BUILDS
+            model_path, quantize = builds.get(variant, builds[self.variants[0]["id"]])
             try:
                 self._model = ZImage(model_config=ModelConfig.z_image_turbo(),
                                      quantize=quantize, model_path=model_path)
-            except Exception as e:  # the 4-bit build is a community pre-quant repo — guide, don't traceback
+            except Exception as e:  # pre-quant builds live in community repos — guide, don't traceback
                 m = str(e).lower()
                 if model_path and any(k in m for k in ("not found", "404", "401", "403",
                                                        "repository", "gated", "restricted")):
                     raise ValueError(
-                        "The 4-bit Z-Image build (filipstrand/Z-Image-Turbo-mflux-4bit) couldn't be "
-                        "downloaded — it may have moved or you may be offline. Try the 8-bit or bf16 build."
+                        f"The {variant} build ({model_path}) couldn't be downloaded — it may have "
+                        "moved or you may be offline. Try another build of this model."
                     ) from None
                 raise
             self._variant = variant
