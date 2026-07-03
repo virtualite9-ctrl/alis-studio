@@ -114,12 +114,15 @@ too large to ship inside a DMG.
 The **Model** section in Settings (and the whole settings panel) is built from whatever backends are
 installed — the UI discovers them at startup via `/api/models` and `/api/catalog`, so adding a model
 needs no UI changes. Each model's builds are grouped under its name; switch with **Use**, manage
-downloads inline, and the previous build is freed when you switch (two big models won't fit at once).
+downloads inline, and switching **builds of the same model** frees the previous one (two big builds
+won't fit at once). Switching **between models** on a Mac with ≤ 32 GB frees the previous model
+automatically (two pipelines won't fit); bigger Macs keep it cached for instant switch-back.
 
 | Model | Builds | Download |
 |---|---|---|
 | **Krea 2 Turbo** | 8-bit (14.2 GB) · mixed-4/8 (9.8 GB). 8-step Turbo. Wants ≥ 24 GB RAM. | managed in-app (resumable, with progress) |
 | **Z-Image Turbo** | 4-bit (~6 GB) · 8-bit · bf16. 9-step Turbo, Apache-2.0. **Runs on 16 GB**; multilingual (Qwen3 encoder). | auto on first use via mflux |
+| **CyberRealistic Z** | 4-bit (~5.5 GB, **runs on 16 GB**) · 8-bit (~10 GB, ≥ 24 GB). [Civitai](https://civitai.com/models/2218365) photorealism finetune of Z-Image Turbo by [Cyberdelia](https://civitai.com/user/Cyberdelia) (OpenRAIL-M). Separate weights from the base model. | auto on first use ([mlx build](https://huggingface.co/avlp12/CyberRealistic-Z-Image-Turbo-v4-mflux-4bit)) |
 | **Qwen-Image** | 8-bit, bf16. Apache-2.0, open. (No 4-bit — its ~20B transformer gets grainy below 8-bit.) | auto on first use via mflux (~40 GB) |
 | **Qwen-Image Edit** | 8-bit (needs ≥ 64 GB) · bf16 (≥ 96 GB). Apache-2.0 instruction editing. (No 4-bit — mflux quantizes it to noise.) | auto on first use via mflux (~54 GB) |
 | **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |
@@ -213,7 +216,9 @@ Everything runs **locally** — prompts and images never leave your Mac.
 This application is **MIT** licensed ([`LICENSE`](LICENSE)). **Each model carries its own license:**
 the Krea 2 Turbo backend uses weights under the
 [Krea 2 Community License](https://krea.ai/krea-2-licensing) (commercial use requires annual revenue
-under $1M; content filtering required for deployments — the built-in filter is on by default). You're
+under $1M; content filtering required for deployments — the built-in filter is on by default), and
+**CyberRealistic Z** is **CreativeML OpenRAIL-M** — use-based restrictions apply; see the
+[model card](https://huggingface.co/avlp12/CyberRealistic-Z-Image-Turbo-v4-mflux-4bit). You're
 responsible for complying with the license of any model you load.
 
 *Part of the **Alis** MLX line — see also [krea2_alis_mlx](https://github.com/avlp12/krea2_alis_mlx).*

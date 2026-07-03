@@ -85,8 +85,39 @@ def _apply_safety(images, enabled):
     try:
         from krea2 import safety
         return safety.apply(images, enabled=True)
-    except Exception:
+    except Exception as e:
+        # failing OPEN is deliberate (never block a local user's own generation on a classifier
+        # hiccup) but it must not be silent — flagged=0 would look identical to "checked clean"
+        print(f"[alis] WARNING: NSFW safety filter unavailable ({e!r}) — images returned unfiltered")
         return list(images), 0
+
+
+_EVICT_RAM_GIB = 32   # at or below this, keep only ONE model resident across backends
+
+
+def _free_other_backends(active):
+    """Free models cached by OTHER backends before a new one loads. Big Macs keep them resident
+    (instant switch-back); on a constrained Mac two ~6 GB pipelines (e.g. Z-Image + a finetune of
+    it) plus a VAE-decode peak can OOM. Called on the GPU thread — all MLX work is serialized
+    there, so no backend is mid-generation while we drop its model."""
+    ram = _ram_gib()
+    if not ram or ram > _EVICT_RAM_GIB:
+        return
+    freed = False
+    for b in _registry().backends.values():
+        if b is active:
+            continue
+        for attr in ("_model", "_pipe"):   # z-image/qwen/flux use _model; krea2 uses _pipe
+            if getattr(b, attr, None) is not None:
+                setattr(b, attr, None)
+                if hasattr(b, "_variant"):
+                    b._variant = None
+                freed = True
+    if freed:
+        import gc
+        import mlx.core as mx
+        gc.collect()
+        mx.clear_cache()
 
 
 def _datauri_to_temp(data_uri, prefix):
@@ -154,8 +185,8 @@ def _ram_gib() -> float:
 
 # Quality-preference order for the "recommended for your Mac" hint: flagship first. The pick is the
 # first of these that's installed AND whose RAM floor (Backend.min_ram_gib) this machine clears.
-# Text-to-image models only — "qwen-image-edit" is intentionally omitted: it needs an input image,
-# so it's never a sensible default pick even on a large Mac.
+# Text-to-image models only — "qwen-image-edit" is intentionally omitted (it needs an input image),
+# and so is "cyberrealistic-z" (community finetune: don't default users onto third-party weights).
 _RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "flux-dev", "z-image-turbo", "flux-schnell"]
 
 
@@ -393,6 +424,7 @@ class Handler(BaseHTTPRequestHandler):
                     if backend.will_load(variant):   # model not in memory → load (first ever use also downloads)
                         safe_emit({"type": "status",
                                    "message": f"Loading {backend.label}… (first use may download weights)"})
+                        _free_other_backends(backend)   # constrained Macs: don't stack two pipelines
                     out = backend.generate(prompt=str(req.get("prompt", "")), variant=variant,
                                            params=params, step_callback=step)
                     if _CANCEL.is_set():  # stopped after the last step, or by a backend that doesn't tick
