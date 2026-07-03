@@ -28,6 +28,24 @@ body{background:var(--bg);color:var(--text);font-family:var(--font);font-size:15
 .scroll{flex:1;min-height:0;overflow-y:auto;overscroll-behavior:contain}
 button{font-family:inherit;cursor:pointer}
 .top{display:flex;align-items:center;gap:10px;padding:11px 18px;border-bottom:0.5px solid var(--border);background:var(--surface-2);flex:none;z-index:5}
+/* --- native-app feel (v0.8.2) --- */
+body{user-select:none;-webkit-user-select:none;cursor:default}   /* chrome is not selectable text */
+input,textarea,[contenteditable]{user-select:text;-webkit-user-select:text}
+input[type=text],input[type=number],input[type=search],textarea,[contenteditable]{cursor:text}
+input[type=range],input[type=checkbox]{cursor:pointer}
+button,select,a,.ap,.edsw,.edsz,.edthumb,.mpr,.gcard img{cursor:pointer}
+:focus-visible{outline:2px solid color-mix(in srgb,var(--clay) 60%,transparent);outline-offset:2px;border-radius:4px}
+.gen:active,.qbtn:active,.iconbtn:active,.edtool:active,.sq:active,.pill:active,.gbtn:active,.edsw:active,.edsz:active{transform:scale(.96)}
+::-webkit-scrollbar{width:9px;height:9px}
+::-webkit-scrollbar-thumb{background:color-mix(in srgb,var(--muted) 45%,transparent);border-radius:5px;border:2px solid transparent;background-clip:content-box}
+::-webkit-scrollbar-thumb:hover{background:color-mix(in srgb,var(--muted) 70%,transparent);background-clip:content-box}
+::-webkit-scrollbar-track{background:transparent}
+/* inside the pywebview app: content extends under the hidden titlebar — inset for the traffic
+   lights, and let the whole top bar drag the window (buttons opt out) */
+body.native .top{padding-left:86px;padding-top:13px;padding-bottom:13px}
+body.native .top .ver{user-select:none}
+body.native.winblur .top{opacity:.72}
+body.native.winblur .brand,body.native.winblur .logo{filter:grayscale(.5)}
 .logo{width:26px;height:26px;border-radius:7px;background:var(--clay);display:flex;align-items:center;justify-content:center;color:var(--on-clay)}
 .logo svg{width:16px;height:16px}
 .brand{font-size:15px;font-weight:500;letter-spacing:-.01em}
@@ -117,7 +135,7 @@ input[type=range]{width:100%;accent-color:var(--clay)}
 .lbside{width:320px;padding:4px 4px 4px 0;display:flex;flex-direction:column;gap:10px;min-height:0}
 .lblab{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
 .lbprompt{font-size:13px;color:var(--text);line-height:1.5;flex:1;min-height:120px;resize:none;border:1px solid var(--muted);border-radius:9px;padding:10px 11px;background:var(--surface-1);font-family:inherit;outline:none}
-.lbprompt:focus{border-color:var(--clay)}
+.lbprompt:focus{border-color:var(--clay);outline:none}   /* the clay border IS the focus indicator — no double ring */
 .lbmeta{font-size:11px;color:var(--muted);font-family:var(--mono)}
 .lbacts{display:flex;gap:8px}
 .iconbtn{width:34px;height:34px;border:1px solid var(--muted);border-radius:9px;background:transparent;color:var(--text-2);cursor:pointer;display:inline-flex;align-items:center;justify-content:center}
@@ -308,6 +326,23 @@ const backendOf=v=>BACKENDS.find(b=>b.id===(v||"").split(":")[0]);
 
 prompt.addEventListener("input",()=>{prompt.style.height="auto";prompt.style.height=Math.min(prompt.scrollHeight,220)+"px";});
 prompt.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.key==="Enter")generate();});
+// ⌘G toggles the gallery everywhere (also exposed in the native View menu)
+document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.code==="KeyG"&&!e.shiftKey){e.preventDefault();toggleGallery();}});
+// running inside the pywebview app: adopt native window chrome behaviors
+(function(){
+  const arm=()=>{
+    if(document.body.classList.contains("native"))return;
+    document.body.classList.add("native");
+    // the top bar's passive parts drag the window (buttons/chips stay clickable)
+    document.querySelectorAll(".top .logo,.top .brand,.top .ver").forEach(n=>n.classList.add("pywebview-drag-region"));
+    const sp=document.querySelector('.top span[style*="flex:1"]');if(sp)sp.classList.add("pywebview-drag-region");
+    window.addEventListener("blur",()=>document.body.classList.add("winblur"));
+    window.addEventListener("focus",()=>document.body.classList.remove("winblur"));
+    // a Mac app doesn't pop a browser context menu on its chrome — keep it for text fields & images
+    document.addEventListener("contextmenu",e=>{if(!e.target.closest("input,textarea,img"))e.preventDefault();});
+  };
+  if(window.pywebview)arm();else window.addEventListener("pywebviewready",arm);
+})();
 safetyBtn.addEventListener("click",()=>{safetyOn=!safetyOn;safetyBtn.classList.toggle("on",safetyOn);safetyBtn.title="NSFW safety filter: "+(safetyOn?"on":"off");});
 gen.addEventListener("click",()=>{busy?stopGen():generate();});
 $("#queueBtn").addEventListener("click",queueCurrent);
