@@ -38,6 +38,7 @@ class ZImageTurboBackend(Backend):
     }
     id = "z-image-turbo"
     label = "Z-Image Turbo"
+    supports_preview = True   # ZImage exposes _decode_latents(latents, config) → live preview works (inherited by cyber-z)
     min_ram_gib = 16   # 4-bit pipeline ~6 GB resident; 1024² peaks ~8.5 GB with VAE tiling → runs on 16 GB
     prompt_note = "The general-purpose base model (Apache-2.0 — the safest license here). Understands Korean natively (Qwen3 encoder); distilled — fast at ~9 steps."
     info = "Apache-2.0 (open) · 4-bit runs on a 16 GB Mac (best at 512–768px) · downloads on first use via mflux"

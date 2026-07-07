@@ -78,6 +78,13 @@ def _png_datauri(im) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
+def _jpeg_datauri(im, quality=72) -> str:
+    """Small lossy data URI for live-preview frames (thumbnails) — keeps the stream light."""
+    buf = io.BytesIO()
+    im.convert("RGB").save(buf, format="JPEG", quality=quality)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
 def _apply_safety(images, enabled):
     """App-level NSFW filter (reuses krea2's pure-MLX classifier). Passes through if unavailable."""
     if not enabled:
@@ -187,7 +194,8 @@ def _ram_gib() -> float:
 # first of these that's installed AND whose RAM floor (Backend.min_ram_gib) this machine clears.
 # Text-to-image models only — "qwen-image-edit" is intentionally omitted (it needs an input image),
 # and so is "cyberrealistic-z" (community finetune: don't default users onto third-party weights).
-_RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "flux-dev", "z-image-turbo", "flux2-klein", "flux-schnell"]
+_RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "ernie-image-turbo", "flux-dev", "z-image-turbo",
+                    "flux2-klein", "flux-schnell"]
 
 
 def _recommended_model(ram: float):
@@ -588,8 +596,19 @@ class Handler(BaseHTTPRequestHandler):
                     raise _Cancelled()
                 emit({"type": "step", "step": s, "total": total})
 
+            def preview(s, total, im):   # in-progress frame (Live preview); best-effort, never blocks a run
+                try:
+                    safe_emit({"type": "preview", "step": s, "total": total, "image": _jpeg_datauri(im)})
+                except Exception:
+                    pass
+
             try:
                 backend, variant = _registry().resolve(req.get("model", ""))
+                # Live preview: attach the frame emitter to the step callback (mflux backends read
+                # step.preview via _wire_progress). Opt-in from the UI (default on), and only for
+                # backends that can decode in-progress latents — others silently show progress only.
+                if req.get("preview", True) and getattr(backend, "supports_preview", False):
+                    step.preview = preview
                 # Hard RAM gate: refuse a build whose memory floor this Mac can't meet, BEFORE mflux
                 # fetches gigabytes of weights only to OOM at load. The UI shows a confirm dialog and
                 # sends allow_low_ram=true to override; power users can set ALIS_ALLOW_LOW_RAM. A failed
