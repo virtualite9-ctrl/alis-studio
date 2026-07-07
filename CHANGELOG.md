@@ -8,6 +8,27 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.9.0] — 2026-07-07
+
+### Added
+- **ERNIE-Image Turbo** — Baidu's 8B text-to-image model (Apache-2.0, April 2026), the strongest
+  option here for **text rendering and structured layouts** (posters, comics, labels) where the
+  letters have to be right. Distilled — clean images in ~8 steps. Best with English or Chinese
+  prompts. img2img and LoRA included. Offered in **8-bit** and **bf16**; downloads ~32 GB on first
+  use. It's a roomy-Mac model: mflux loads the full weights before quantizing, so even 8-bit peaks
+  near full precision at load (there's no pre-quantized repo to stream onto a small Mac), hence the
+  ~48 GB floor and the RAM gate. *4-bit is deliberately not offered* — it would shrink the resident
+  footprint but not the load peak, so it buys a constrained Mac nothing while implying it can run.
+  (Resolves the ERNIE part of #26.)
+- **Live preview** — watch the image form. When on (a new eye toggle next to the safety shield, and
+  the default), the app decodes a few downscaled in-progress frames during a run and streams them
+  under the progress bar — the "preview mode" people know from CivitAI, for iterating on a prompt
+  without waiting for the full render. Throttled to ~3 frames per run (and only the first image of a
+  batch) so the cost is bounded; turn it off for maximum speed. Available on the models whose
+  in-progress latents can be decoded — **Z-Image, CyberRealistic Z, ERNIE-Image, Qwen-Image, and
+  FLUX** (the toggle hides itself for the others). Fully best-effort: a decode hiccup silently drops
+  the preview and never affects the actual generation or Stop. (Resolves #24.)
+
 ## [0.8.3] — 2026-07-03
 
 ### Fixed

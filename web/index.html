@@ -214,6 +214,7 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
 .progress{display:none;margin:8px 0 2px}.progress.show{display:block}
 .bar{height:4px;border-radius:2px;background:var(--surface-1);overflow:hidden}.bar i{display:block;height:100%;width:0;background:var(--clay);border-radius:2px;transition:width .25s}
 .pmeta{display:flex;justify-content:space-between;font-size:12px;color:var(--text-2);margin-top:8px;font-family:var(--mono)}
+.prev{display:none;margin-top:10px}.prev.show{display:block}.prev img{max-width:min(384px,100%);border-radius:10px;border:1px solid var(--border);display:block}
 #results{display:flex;flex-direction:column;gap:14px}
 .card{border:1px solid var(--border);border-radius:14px;overflow:hidden;background:var(--surface-2)}.card img{display:block;width:100%}
 .cap{display:flex;align-items:center;gap:10px;padding:10px 12px}
@@ -248,6 +249,7 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
       <textarea id="prompt" rows="2" placeholder="Describe an image to generate…">a serene mountain lake at sunrise, mist over the water</textarea>
       <div class="crow">
         <button class="iconbtn on" id="safety" aria-label="NSFW safety filter on" title="NSFW safety filter: on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3l7 3v6c0 4.4-3 7.6-7 9-4-1.4-7-4.6-7-9V6z"/><path d="M9 12l2 2 4-4"/></svg></button>
+        <button class="iconbtn on" id="previewBtn" style="display:none" aria-label="Live preview on" title="Live preview: on"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M2 12s3.5-7 10-7 10 7 10 7-3.5 7-10 7-10-7-10-7z"/><circle cx="12" cy="12" r="3"/></svg></button>
         <button class="enhbtn" id="enhbtn" title="Rewrite the prompt in English with a local model"><svg viewBox="0 0 24 24" fill="currentColor"><path d="M12 2l1.9 5.1L19 9l-5.1 1.9L12 16l-1.9-5.1L5 9l5.1-1.9z"/></svg>Enhance</button>
         <span style="flex:1"></span>
         <button class="qbtn" id="queueBtn" style="display:none" title="Queue this prompt to run next (Stop clears the queue)" aria-label="Queue this prompt"><svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round"><path d="M4 6h12M4 12h12M4 18h8"/><path d="M19 13v6M16 16h6"/></svg><span id="qcount"></span></button>
@@ -255,7 +257,7 @@ textarea.fld{height:auto;min-height:54px;padding:8px 10px;resize:vertical;line-h
       </div>
     </div>
     <div class="phint" id="phint"></div>
-    <div class="progress" id="progress"><div class="bar"><i id="barfill"></i></div><div class="pmeta"><span id="pstep">Loading model…</span><span id="ptime"></span></div></div>
+    <div class="progress" id="progress"><div class="bar"><i id="barfill"></i></div><div class="pmeta"><span id="pstep">Loading model…</span><span id="ptime"></span></div><div class="prev" id="prevWrap"><img id="prevImg" alt="in-progress preview"></div></div>
     <div class="err" id="err"></div>
     <div id="results"></div>
     <div class="empty" id="empty">
@@ -316,7 +318,9 @@ const $=s=>document.querySelector(s);
 const prompt=$("#prompt"),gen=$("#gen"),results=$("#results"),empty=$("#empty"),errBox=$("#err");
 const progress=$("#progress"),barfill=$("#barfill"),pstep=$("#pstep"),ptime=$("#ptime");
 const modelGroup=$("#modelGroup"),paramGroups=$("#paramGroups"),activeName=$("#activeName"),safetyBtn=$("#safety");
+const previewBtn=$("#previewBtn"),prevWrap=$("#prevWrap"),prevImg=$("#prevImg");
 let BACKENDS=[],CATALOG={backends:[],disk_gb:0},PV={},current="",safetyOn=true,busy=false,t0=0,timer=null,aborter=null;
+let previewOn=true;try{previewOn=localStorage.getItem("alis_preview")!=="0";}catch(e){}
 let IMGSET={};   // programmatic setters for "image" params (key → set(uri)), rebuilt by renderParams — lets paste/drop feed the img2img input
 let LORAS=[];    // the LoRA library (/api/loras), shared by every model's "loras" control
 let SEEDCTL=null;   // seed control's {roll} — used by auto-seed
@@ -372,6 +376,8 @@ document.addEventListener("keydown",e=>{if((e.metaKey||e.ctrlKey)&&e.code==="Key
   if(window.pywebview)arm();else window.addEventListener("pywebviewready",arm);
 })();
 safetyBtn.addEventListener("click",()=>{safetyOn=!safetyOn;safetyBtn.classList.toggle("on",safetyOn);safetyBtn.title="NSFW safety filter: "+(safetyOn?"on":"off");});
+previewBtn.addEventListener("click",()=>{previewOn=!previewOn;previewBtn.classList.toggle("on",previewOn);previewBtn.title="Live preview: "+(previewOn?"on":"off");previewBtn.setAttribute("aria-label","Live preview "+(previewOn?"on":"off"));try{localStorage.setItem("alis_preview",previewOn?"1":"0");}catch(e){}});
+function syncPreviewBtn(){const b=backendOf(current);const show=!!(b&&b.supports_preview);previewBtn.style.display=show?"":"none";previewBtn.classList.toggle("on",previewOn);previewBtn.title="Live preview: "+(previewOn?"on":"off");}
 gen.addEventListener("click",()=>{busy?stopGen():generate();});
 $("#queueBtn").addEventListener("click",queueCurrent);
 $("#enhbtn").addEventListener("click",doEnhance);
@@ -822,6 +828,7 @@ function setActive(model,initial){
   const b=backendOf(model),bld=buildOf(model);
   activeName.textContent=b.label+" · "+(bld?bld.label.split(" · ")[0]:model.split(":")[1]);
   $("#phint").textContent=b.prompt_note||"";
+  syncPreviewBtn();
   if(initial||changedBackend)renderParams(b);
   renderModelGroup();
 }
@@ -1068,12 +1075,13 @@ async function generate(){
 }
 async function runGenerate(p,allowLowRam){
   if(AUTOSEED&&SEEDCTL)SEEDCTL.roll();   // fresh seed per run (the input reflects what was used)
-  const body={prompt:p,model:current,safety:safetyOn,params:{...PV}};
+  const body={prompt:p,model:current,safety:safetyOn,preview:previewOn,params:{...PV}};
   if(allowLowRam)body.allow_low_ram=true;
   await submitBody(body,p);
 }
 async function submitBody(body,p){   // one streamed /api/generate run; queued jobs reuse this
   setBusy(true);empty.style.display="none";
+  prevWrap.classList.remove("show");prevImg.removeAttribute("src");   // clear any prior run's preview frame
   progress.classList.add("show");barfill.style.width="0%";pstep.textContent="Loading model…";ptime.textContent="";
   t0=Date.now();clearInterval(timer);timer=setInterval(()=>ptime.textContent=fmt((Date.now()-t0)/1000)+"s",100);
   aborter=new AbortController();
@@ -1085,6 +1093,7 @@ async function submitBody(body,p){   // one streamed /api/generate run; queued j
       while((nl=buf.indexOf("\n"))>=0){const line=buf.slice(0,nl);buf=buf.slice(nl+1);if(line.trim())handle(JSON.parse(line),p);}}
   }catch(e){if(e.name!=="AbortError")showErr("Generation failed: "+e.message);}
   finally{aborter=null;setBusy(false);clearInterval(timer);progress.classList.remove("show");
+    prevWrap.classList.remove("show");prevImg.removeAttribute("src");
     if(QUEUE.length){const j=QUEUE.shift();updateQueueChip();
       submitBody(j.body,j.prompt).catch(e=>showErr("Queued job failed: "+e.message));}}   // never drop the rest of the queue silently
 }
@@ -1093,7 +1102,7 @@ function queueCurrent(){   // snapshot the CURRENT prompt+model+settings as the 
   const p=prompt.value.trim();
   if(!p){showErr("Enter a prompt to queue.");return;}
   if(AUTOSEED&&SEEDCTL)SEEDCTL.roll();   // each queued job gets its own seed when auto-seed is on
-  const body={prompt:p,model:current,safety:safetyOn,
+  const body={prompt:p,model:current,safety:safetyOn,preview:previewOn,
               params:{...PV,loras:(PV.loras||[]).map(e=>({...e}))}};   // deep-ish copy: later UI edits must not mutate the job
   QUEUE.push({body,prompt:p});
   updateQueueChip();
@@ -1106,7 +1115,8 @@ function updateQueueChip(){
 function handle(ev,p){
   if(ev.type==="status"){pstep.textContent=ev.message;}
   else if(ev.type==="step"){barfill.style.width=Math.round(ev.step/ev.total*100)+"%";pstep.textContent="Generating · step "+ev.step+" / "+ev.total;}
-  else if(ev.type==="done"){barfill.style.width="100%";ev.images.forEach((u,i)=>renderCard(u,p,ev.meta,i,ev.images.length));}
+  else if(ev.type==="preview"){prevImg.src=ev.image;prevWrap.classList.add("show");}
+  else if(ev.type==="done"){barfill.style.width="100%";prevWrap.classList.remove("show");ev.images.forEach((u,i)=>renderCard(u,p,ev.meta,i,ev.images.length));}
   else if(ev.type==="cancelled"){pstep.textContent="Stopped.";}
   else if(ev.type==="error"){showErr(ev.message||"Generation failed.");}
 }

@@ -82,9 +82,14 @@ too large to ship inside a DMG.
   renders keep the exact decode. Override with `ALIS_VAE_TILING=1`/`0`.
 - **Bigger images** — per-model max resolution: Krea 2 Turbo up to **2048²** (a native 1K–2K model),
   Qwen-Image 1536², Z-Image / FLUX 1280². The picker warns when a size may not fit your Mac's memory.
-- **Image-to-image** — every generation model (**Krea 2 Turbo**, Z-Image, Qwen, FLUX) takes an
+- **Image-to-image** — every generation model (**Krea 2 Turbo**, Z-Image, Qwen, FLUX, ERNIE) takes an
   optional **Input image** + **Strength**; attach (or just paste) a picture and transform it with
   your prompt.
+- **Live preview** — watch the image form. The eye toggle (next to the safety shield, on by default)
+  streams a few downscaled in-progress frames under the progress bar as it denoises — the "preview"
+  behaviour you know from CivitAI, handy for iterating on a prompt. Throttled to ~3 frames per run;
+  each frame is a quick VAE decode, so it adds a little time on the big models — turn it off for
+  maximum speed. Available on Z-Image, CyberRealistic Z, ERNIE-Image, Qwen-Image, and FLUX.
 - **LoRA** — a shared library for style/subject adapters: paste a download URL (on Civitai, the
   **Download button's link**, not the page URL; on Hugging Face, the file's `/resolve/` URL) or a
   local `.safetensors`, check the ones to apply, set per-LoRA strength — multiple LoRAs stack, and
@@ -135,6 +140,7 @@ automatically (two pipelines won't fit); bigger Macs keep it cached for instant 
 | **Z-Image Turbo** | 4-bit (~6 GB) · 8-bit · bf16. 9-step Turbo, Apache-2.0. **Runs on 16 GB**; multilingual (Qwen3 encoder). | auto on first use via mflux |
 | **CyberRealistic Z** | 4-bit (~5.5 GB, **runs on 16 GB**) · 8-bit (~10 GB, ≥ 24 GB). [Civitai](https://civitai.com/models/2218365) photorealism finetune of Z-Image Turbo by [Cyberdelia](https://civitai.com/user/Cyberdelia) (OpenRAIL-M). Separate weights from the base model. | auto on first use ([mlx build](https://huggingface.co/avlp12/CyberRealistic-Z-Image-Turbo-v4-mflux-4bit)) |
 | **Qwen-Image** | 8-bit, bf16. Apache-2.0, open. (No 4-bit — its ~20B transformer gets grainy below 8-bit.) | auto on first use via mflux (~40 GB) |
+| **ERNIE-Image Turbo** | 8-bit (≥ 48 GB) · bf16 (≥ 64 GB). Baidu's 8B, Apache-2.0. **Best here for text rendering / posters / structured layouts**; ~8-step Turbo. (No 4-bit — loads full precision before quantizing, so 4-bit wouldn't lower the load floor.) | auto on first use via mflux (~32 GB) |
 | **Qwen-Image Edit** | 8-bit (needs ≥ 64 GB) · bf16 (≥ 96 GB). Apache-2.0 instruction editing. (No 4-bit — mflux quantizes it to noise.) | auto on first use via mflux (~54 GB) |
 | **FLUX.2 klein 4B** | 4-bit (**runs on 16 GB**) · 8-bit · bf16. BFL's 2026 fast model, ~4 steps, Apache-2.0, **ungated**. img2img + LoRA. | auto on first use via mflux (~15 GB) |
 | **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |
