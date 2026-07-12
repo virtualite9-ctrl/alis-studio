@@ -29,6 +29,7 @@ class Backend:
     params: list[dict] = []      # settings schema (see module docstring)
     catalog: list[dict] = []     # downloadable builds (see studio/registry conventions); empty = managed elsewhere
     min_ram_gib = 0              # unified-memory floor to run this model acceptably; drives the "recommended for your Mac" hint
+    supports_preview = False     # True if generate() can stream in-progress frames (the UI shows a "Live preview" toggle)
 
     @classmethod
     def is_available(cls) -> bool:
@@ -39,7 +40,7 @@ class Backend:
     def meta(self) -> dict:
         return {"id": self.id, "label": self.label, "info": self.info,
                 "prompt_note": self.prompt_note, "variants": self.variants, "params": self.params,
-                "min_ram_gib": self.min_ram_gib}
+                "min_ram_gib": self.min_ram_gib, "supports_preview": self.supports_preview}
 
     def min_ram_for(self, variant: str) -> int:
         """RAM floor (GiB) for a specific build. Defaults to the backend-wide min_ram_gib, but a

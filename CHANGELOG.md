@@ -8,6 +8,141 @@ The version lives in exactly one place — `studio/__version__` (in `studio/__in
 `pyproject.toml` reads it via `[tool.setuptools.dynamic]`, the server injects it into the
 web UI, and the DMG build stamps it into the app bundle.
 
+## [0.9.0] — 2026-07-07
+
+### Added
+- **ERNIE-Image Turbo** — Baidu's 8B text-to-image model (Apache-2.0, April 2026), the strongest
+  option here for **text rendering and structured layouts** (posters, comics, labels) where the
+  letters have to be right. Distilled — clean images in ~8 steps. Best with English or Chinese
+  prompts. img2img and LoRA included. Offered in **8-bit** and **bf16**; downloads ~32 GB on first
+  use. It's a roomy-Mac model: mflux loads the full weights before quantizing, so even 8-bit peaks
+  near full precision at load (there's no pre-quantized repo to stream onto a small Mac), hence the
+  ~48 GB floor and the RAM gate. *4-bit is deliberately not offered* — it would shrink the resident
+  footprint but not the load peak, so it buys a constrained Mac nothing while implying it can run.
+  (Resolves the ERNIE part of #26.)
+- **Live preview** — watch the image form. When on (a new eye toggle next to the safety shield, and
+  the default), the app decodes a few downscaled in-progress frames during a run and streams them
+  under the progress bar — the "preview mode" people know from CivitAI, for iterating on a prompt
+  without waiting for the full render. Throttled to ~3 frames per run (and only the first image of a
+  batch) so the cost is bounded; turn it off for maximum speed. Available on the models whose
+  in-progress latents can be decoded — **Z-Image, CyberRealistic Z, ERNIE-Image, Qwen-Image, and
+  FLUX** (the toggle hides itself for the others). Fully best-effort: a decode hiccup silently drops
+  the preview and never affects the actual generation or Stop. (Resolves #24.)
+
+## [0.8.3] — 2026-07-03
+
+### Fixed
+- **Top bar was clipped under the titlebar** in the native window (v0.8.2 regression): macOS can
+  still draw titlebar material over the first ~28 px even with a transparent titlebar, so the top
+  bar's content was sliced. The app now injects a same-colour titlebar spacer that owns that strip
+  (and doubles as the window drag area) — nothing real renders under the material anymore.
+
+## [0.8.2] — 2026-07-03
+
+### Changed
+- **The app now looks like a Mac app, not a wrapped web page.** In the native window: the title
+  bar is transparent and hidden — the traffic lights sit directly on the app's own top bar
+  (unified-toolbar chrome, applied on the main thread), the top bar's passive areas drag the
+  window, a native **View** menu (Toggle Gallery / Edit an Image / Focus Prompt) appears in the
+  menu bar, the browser context menu is suppressed on chrome (kept for text fields and images),
+  and the window dims its chrome when inactive.
+- Web-tea removed everywhere (browser too): UI chrome is no longer selectable text (inputs stay
+  selectable), cursors are native (pointer on controls, default elsewhere), focus rings are the
+  app's clay accent instead of the browser default, buttons have a subtle press state, and
+  scrollbars are thin macOS-style overlays.
+- **⌘G** toggles the gallery; **⌘Enter** still generates.
+
+## [0.8.1] — 2026-07-03
+
+### Added
+- **FLUX.2 klein 4B** — BFL's January-2026 fast model (Apache-2.0, **ungated** — no HF login,
+  unlike FLUX.1): ~4-step distilled, ~15 GB download, 4-bit build runs on a 16 GB Mac. img2img and
+  LoRA included. The 9B sibling stays out (gated, restrictive license).
+- **Generation queue** — while a run is in flight, a **Queue** button appears next to Stop: it
+  snapshots the current prompt + model + settings as the next job. Queued jobs run back-to-back
+  (each gets its own seed when auto-seed is on); the badge shows how many are waiting, and **Stop
+  clears the queue**.
+
+## [0.8.0] — 2026-07-03
+
+### Added
+- **LoRA support** — the capability people run ComfyUI for, without the node graph. Every mflux
+  model (Z-Image, CyberRealistic Z, Qwen-Image, Qwen-Image Edit, FLUX) gets a **LoRA** section:
+  a shared library (add by **Civitai/HF download URL** or a local `.safetensors` path), check the
+  ones to apply, and set a per-LoRA strength (0–2). Multiple LoRAs stack; Civitai's
+  ComfyUI/kohya/diffusers key formats are recognized automatically (mflux). Changing the set
+  reloads the model (seconds — LoRA is fused at load). Auth-gated Civitai downloads work with
+  `CIVITAI_API_TOKEN` set.
+- **Restore settings** — every gallery item now stores its full recipe (model, build, size, steps,
+  seed, guidance, LoRAs + strengths). A new lightbox button restores all of it — model switched,
+  controls repopulated, prompt refilled — so any past image is one click from a re-run or a tweak.
+  The recipe is also embedded in the PNG itself (`tEXt "alis"`), like ComfyUI's workflow-in-PNG.
+- **Auto-seed** — a new toggle next to the seed dice rolls a fresh random seed on every Generate
+  (the seed box always shows what was used, so results stay reproducible).
+
+## [0.7.5] — 2026-07-03
+
+### Added
+- **CyberRealistic Z** — the first community model adopted from **Civitai**: Cyberdelia's
+  photorealism finetune of Z-Image Turbo (v4.0, taken from the creator's own HF mirror,
+  CreativeML OpenRAIL-M). Converted from the ComfyUI single-file checkpoint to the mflux layout
+  (fused-qkv split + key remap, verified key-complete both ways) and re-hosted pre-quantized —
+  **4-bit (~5.5 GB) runs on a 16 GB Mac**, 8-bit (~10 GB) for bigger machines. Same ~9-step /
+  no-CFG / multilingual recipe as Z-Image Turbo, img2img included.
+  - Candidates that didn't make the cut: Moody Pro Mix (no-derivatives license), RedCraft KREA2
+    (INT8-ConvRot only, no bf16 source — would double-quantize).
+
+### Changed
+- **Memory honesty across models** (3-lens review): on Macs with ≤ 32 GB, loading a model now frees
+  the one another backend had cached — A/B-ing Z-Image against its finetune used to stack two ~6 GB
+  pipelines and could OOM a 16 GB machine. Stock Z-Image 8-bit/bf16 gained explicit RAM floors
+  (24 / 32 GB — they quantize on the fly from the ~33 GB bf16 repo); CyberRealistic 8-bit wants
+  ≥ 24 GB.
+- An unknown build id now errors instead of silently substituting (and mislabeling) the default
+  build; a failed NSFW-filter load is logged instead of silently passing images through unfiltered.
+- Model backends touch the repo's `config.json` on first download so Hugging Face counts the
+  download (mflux itself never fetches it).
+
+## [0.7.4] — 2026-07-02
+
+### Added
+- **Bring your own image** — the canvas editor now takes *your* pictures, not just generated ones:
+  an **Edit** button in the top bar opens a file picker, and you can **drag-drop** an image onto the
+  editor or **paste (⌘V)** one from the clipboard anywhere in the app. If marks are already on the
+  canvas, replacing the image asks first ("Replace the image?").
+- **Krea 2 Turbo learns img2img** — the flagship model now takes an **Input image + Strength** like
+  the rest: the picture is encoded with the sampler's own VAE and the rectified-flow schedule is
+  entered at the matching timestep (lower strength = fewer steps = faster). Via `krea2-alis-mlx`
+  0.2.0; picked up automatically by the DMG build.
+- **Paste routes to the right place** — with the editor open, a pasted image replaces the editing
+  base; with it closed, it lands in the **Input image** (img2img) of the selected model and the drop
+  zone highlights; a text-to-image-only model would open the editor instead.
+- The settings panel now **says why** the Input image control would be missing on a
+  text-to-image-only model (none ship today — Krea 2 Turbo was the last, and it just learned).
+
+## [0.7.3] — 2026-07-02
+
+### Added
+- **Shape tools** — the canvas editor grows from Sketch/Text to five tools: **Sketch, Circle, Box,
+  Arrow, Text**. Shapes are drag-drawn with a live preview; a bare click with a shape tool is
+  ignored (no accidental dots).
+- **Stroke sizes** — Thin / Medium / Thick, applied to strokes, shapes, and text.
+- **Redo** — full undo/redo for every mark (including text), with **⌘Z / ⇧⌘Z** while the editor
+  is open (text fields keep their native undo).
+- **Step history** — every edit result joins a thumbnail strip (*Original → Step 1 → …*); click a
+  step to put it back on the canvas and continue from there (results also live in the gallery).
+- **Fast / Fine quality** — 4-step (default) or 8-step edits, one tap.
+- Each run now uses a **fresh random seed**, so "Edit" again on the same marks gives a new take.
+- **Discard guards** — closing the editor (✕ / backdrop / Esc) or switching steps now asks before
+  throwing away unsaved marks; Esc during a drag abandons just that drag; Clear can be brought back
+  with Redo. ⌘Z/⇧⌘Z use the physical key, so undo works under a Korean input source.
+
+### Changed
+- Editor side panel reorganized ("Quiet Workshop" pass): sectioned Mark it / Describe the change /
+  Steps, an icon toolbar, size dots, and disabled-state Undo/Redo. The base image is pre-rendered
+  once, so long strokes stay smooth on big images; coordinates are guarded against a not-yet-laid-out
+  canvas.
+
 ## [0.7.2] — 2026-07-02
 
 ### Added

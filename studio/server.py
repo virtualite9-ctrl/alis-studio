@@ -78,6 +78,13 @@ def _png_datauri(im) -> str:
     return "data:image/png;base64," + base64.b64encode(buf.getvalue()).decode()
 
 
+def _jpeg_datauri(im, quality=72) -> str:
+    """Small lossy data URI for live-preview frames (thumbnails) — keeps the stream light."""
+    buf = io.BytesIO()
+    im.convert("RGB").save(buf, format="JPEG", quality=quality)
+    return "data:image/jpeg;base64," + base64.b64encode(buf.getvalue()).decode()
+
+
 def _apply_safety(images, enabled):
     """App-level NSFW filter (reuses krea2's pure-MLX classifier). Passes through if unavailable."""
     if not enabled:
@@ -85,8 +92,39 @@ def _apply_safety(images, enabled):
     try:
         from krea2 import safety
         return safety.apply(images, enabled=True)
-    except Exception:
+    except Exception as e:
+        # failing OPEN is deliberate (never block a local user's own generation on a classifier
+        # hiccup) but it must not be silent — flagged=0 would look identical to "checked clean"
+        print(f"[alis] WARNING: NSFW safety filter unavailable ({e!r}) — images returned unfiltered")
         return list(images), 0
+
+
+_EVICT_RAM_GIB = 32   # at or below this, keep only ONE model resident across backends
+
+
+def _free_other_backends(active):
+    """Free models cached by OTHER backends before a new one loads. Big Macs keep them resident
+    (instant switch-back); on a constrained Mac two ~6 GB pipelines (e.g. Z-Image + a finetune of
+    it) plus a VAE-decode peak can OOM. Called on the GPU thread — all MLX work is serialized
+    there, so no backend is mid-generation while we drop its model."""
+    ram = _ram_gib()
+    if not ram or ram > _EVICT_RAM_GIB:
+        return
+    freed = False
+    for b in _registry().backends.values():
+        if b is active:
+            continue
+        for attr in ("_model", "_pipe"):   # z-image/qwen/flux use _model; krea2 uses _pipe
+            if getattr(b, attr, None) is not None:
+                setattr(b, attr, None)
+                if hasattr(b, "_variant"):
+                    b._variant = None
+                freed = True
+    if freed:
+        import gc
+        import mlx.core as mx
+        gc.collect()
+        mx.clear_cache()
 
 
 def _datauri_to_temp(data_uri, prefix):
@@ -106,10 +144,15 @@ def _datauri_to_temp(data_uri, prefix):
 
 def _stash_input_image(params):
     """For img2img: decode an uploaded image (data URI in params['init_image']) to a temp PNG and set
-    params['image_path'] (what mflux's generate_image expects). Returns the temp path, or None."""
-    path = _datauri_to_temp(params.pop("init_image", None), "alis_in_")
+    params['image_path'] (what the backends' generate expects). Returns the temp path, or None.
+    An attached image that fails to decode raises — silently generating WITHOUT the image the user
+    attached would be far more confusing than an error."""
+    value = params.pop("init_image", None)
+    path = _datauri_to_temp(value, "alis_in_")
     if path:
         params["image_path"] = path
+    elif value:
+        raise ValueError("Couldn't decode the attached image — remove it and attach it again.")
     return path
 
 
@@ -149,9 +192,10 @@ def _ram_gib() -> float:
 
 # Quality-preference order for the "recommended for your Mac" hint: flagship first. The pick is the
 # first of these that's installed AND whose RAM floor (Backend.min_ram_gib) this machine clears.
-# Text-to-image models only — "qwen-image-edit" is intentionally omitted: it needs an input image,
-# so it's never a sensible default pick even on a large Mac.
-_RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "flux-dev", "z-image-turbo", "flux-schnell"]
+# Text-to-image models only — "qwen-image-edit" is intentionally omitted (it needs an input image),
+# and so is "cyberrealistic-z" (community finetune: don't default users onto third-party weights).
+_RECOMMEND_ORDER = ["krea2-turbo", "qwen-image", "ernie-image-turbo", "flux-dev", "z-image-turbo",
+                    "flux2-klein", "flux-schnell"]
 
 
 def _recommended_model(ram: float):
@@ -207,12 +251,183 @@ def _safe_id(gid: str) -> bool:
     return bool(gid) and all(c.isalnum() or c in "-_" for c in gid)
 
 
+# ---------------------------------------------------------------------------- LoRA library
+def _lora_dir() -> str:
+    d = os.path.join(os.path.expanduser("~/Library/Application Support/Alis Studio"), "loras")
+    os.makedirs(d, exist_ok=True)
+    return d
+
+
+def _safe_lora_name(name: str) -> bool:
+    """Library entries are flat .safetensors files; names must not traverse."""
+    return (bool(name) and name.endswith(".safetensors") and "/" not in name and "\\" not in name
+            and not name.startswith(".") and all(c.isalnum() or c in "-_. " for c in name))
+
+
+def _lora_list() -> list:
+    d = _lora_dir()
+    items = []
+    for fn in sorted(os.listdir(d)):
+        if fn.endswith(".safetensors") and _safe_lora_name(fn):
+            items.append({"name": fn, "size_mb": round(os.path.getsize(os.path.join(d, fn)) / 1e6, 1)})
+    return items
+
+
+def _verify_safetensors(path: str) -> None:
+    """A .safetensors file starts with a uint64 header length + a '{' JSON header. The most common
+    first-timer mistake is pasting a Civitai model-PAGE url — we'd happily save the HTML otherwise,
+    and mflux would later fuse it as a silent no-op."""
+    import struct
+    try:
+        with open(path, "rb") as f:
+            n = struct.unpack("<Q", f.read(8))[0]
+            first = f.read(1)
+        ok = 2 <= n <= 100 * 1024 * 1024 and first == b"{"
+    except Exception:
+        ok = False
+    if not ok:
+        raise ValueError("That file isn't a .safetensors LoRA. On Civitai, copy the link from the "
+                         "Download button (not the page URL); on Hugging Face, use the file's "
+                         "/resolve/ URL.")
+
+
+def _lora_add(source: str) -> list:
+    """Add a LoRA to the library from a URL (Civitai/HF/direct) or a local file path.
+    Returns the updated list; raises ValueError with a user-facing message on failure."""
+    import shutil
+    import urllib.request
+    source = (source or "").strip()
+    if not source:
+        raise ValueError("Give a download URL or a local .safetensors path.")
+    d = _lora_dir()
+    if source.startswith(("http://", "https://")):
+        url = source
+        if "civitai.com" in url and "token=" not in url and os.environ.get("CIVITAI_API_TOKEN"):
+            url += ("&" if "?" in url else "?") + "token=" + os.environ["CIVITAI_API_TOKEN"]
+        req = urllib.request.Request(url, headers={"User-Agent": "alis-studio"})
+        import ssl
+        try:  # python.org macOS builds ship without system CAs wired into urllib — use certifi's bundle
+            import certifi
+            ctx = ssl.create_default_context(cafile=certifi.where())
+        except Exception:
+            ctx = ssl.create_default_context()
+        tmp = None
+        try:
+            with urllib.request.urlopen(req, timeout=60, context=ctx) as r:
+                # filename: content-disposition beats the URL tail (Civitai serves opaque URLs).
+                # RFC 6266: prefer plain filename=, fall back to filename*=UTF-8''… (percent-encoded)
+                from urllib.parse import unquote
+                cd = r.headers.get("Content-Disposition") or ""
+                name = star = None
+                for part in cd.split(";"):
+                    part = part.strip()
+                    if part.startswith("filename*="):
+                        star = unquote(part.split("''", 1)[-1].strip().strip('"'))
+                    elif part.startswith("filename="):
+                        name = part[len("filename="):].strip().strip('"').strip("'")
+                name = name or star
+                if not name:
+                    name = os.path.basename(url.split("?")[0]) or "lora.safetensors"
+                name = "".join(c for c in name if c.isalnum() or c in "-_. ").lstrip(". ") or "lora.safetensors"
+                if not name.endswith(".safetensors"):
+                    name += ".safetensors"
+                if not _safe_lora_name(name):   # the WRITE path must accept exactly what list/delete accept
+                    raise ValueError(f"Unusable file name from the server: {name!r}")
+                dst = os.path.join(d, name)
+                if os.path.exists(dst):
+                    raise ValueError(f"'{name}' is already in the library — delete it first if you "
+                                     "want to replace it (saved recipes reference LoRAs by name).")
+                cap = 4 * 1024 * 1024 * 1024   # LoRAs are MBs–1.5 GB; anything past 4 GB is not a LoRA
+                cl = r.headers.get("Content-Length")
+                if cl and int(cl) > cap:
+                    raise ValueError(f"That file is {int(cl)/1e9:.1f} GB — too big to be a LoRA.")
+                tmp = os.path.join(d, "." + name + ".part")
+                deadline = time.time() + 30 * 60   # wall-clock cap: timeout=60 only bounds each socket op
+                got = 0
+                with open(tmp, "wb") as f:
+                    while True:
+                        chunk = r.read(1 << 20)
+                        if not chunk:
+                            break
+                        got += len(chunk)
+                        if got > cap:
+                            raise ValueError("Download exceeded 4 GB — aborted (not a LoRA?).")
+                        if time.time() > deadline:
+                            raise ValueError("Download took over 30 minutes — aborted.")
+                        f.write(chunk)
+                _verify_safetensors(tmp)   # reject HTML/error pages saved as ".safetensors"
+                os.replace(tmp, dst)
+                tmp = None
+        except ValueError:
+            raise
+        except Exception as e:
+            msg = str(e)
+            if "401" in msg or "403" in msg:
+                raise ValueError("This download needs a Civitai login — create a free API key at "
+                                 "civitai.com/user/account and start the app with CIVITAI_API_TOKEN set.") from None
+            raise ValueError(f"Couldn't download the LoRA: {msg}") from None
+        finally:
+            if tmp and os.path.exists(tmp):   # no orphaned hidden .part files on any failure
+                try:
+                    os.remove(tmp)
+                except OSError:
+                    pass
+    else:
+        src = os.path.expanduser(source)
+        if not os.path.isfile(src) or not src.endswith(".safetensors"):
+            raise ValueError("Not a .safetensors file: " + source)
+        _verify_safetensors(src)
+        # sanitize like the URL branch — Civitai filenames love parentheses etc.; the library name
+        # must be exactly what list/delete/generate accept
+        name = "".join(c for c in os.path.basename(src) if c.isalnum() or c in "-_. ").lstrip(". ")
+        if not name.endswith(".safetensors"):
+            name += ".safetensors"
+        if not _safe_lora_name(name):
+            raise ValueError(f"Couldn't derive a usable library name from {os.path.basename(src)!r} — rename the file.")
+        dst = os.path.join(d, name)
+        if os.path.exists(dst):
+            raise ValueError(f"'{name}' is already in the library — delete it first to replace it.")
+        shutil.copy2(src, dst)
+    return _lora_list()
+
+
+def _resolve_loras(params) -> None:
+    """Rewrite params['loras'] from UI entries [{'name','scale'}] to backend entries
+    [{'path': <abs library path>, 'scale': float}], validating names against the library."""
+    entries = params.get("loras")
+    if not entries:
+        params.pop("loras", None)
+        return
+    d = _lora_dir()
+    resolved = []
+    for e in entries:
+        name = (e or {}).get("name", "")
+        if not _safe_lora_name(name):
+            raise ValueError(f"Unknown LoRA: {name!r}")
+        path = os.path.join(d, name)
+        if not os.path.isfile(path):
+            raise ValueError(f"LoRA not in the library anymore: {name}")
+        try:
+            scale = float(e.get("scale", 1.0))
+        except (TypeError, ValueError):
+            scale = 1.0
+        resolved.append({"path": path, "scale": max(0.0, min(2.0, scale))})
+    params["loras"] = resolved
+
+
 def _gallery_write(im, gid, ts, prompt, meta) -> str:
     """The one writer: persist a single image + its metadata json to the gallery. Returns the id."""
     d = _gallery_dir()
-    im.save(os.path.join(d, gid + ".png"))
+    record = {"id": gid, "prompt": prompt, "ts": ts, **meta}
+    try:  # embed the full recipe in the PNG itself (tEXt "alis") — survives export/sharing,
+        from PIL.PngImagePlugin import PngInfo  # like ComfyUI's workflow-in-PNG reproducibility
+        info = PngInfo()
+        info.add_text("alis", json.dumps(record))
+        im.save(os.path.join(d, gid + ".png"), pnginfo=info)
+    except Exception:
+        im.save(os.path.join(d, gid + ".png"))
     with open(os.path.join(d, gid + ".json"), "w") as f:
-        json.dump({"id": gid, "prompt": prompt, "ts": ts, **meta}, f)
+        json.dump(record, f)
     return gid
 
 
@@ -276,6 +491,8 @@ class Handler(BaseHTTPRequestHandler):
             self._send(200, "application/json", json.dumps(_catalog()).encode())
         elif path == "/api/gallery":
             self._send(200, "application/json", json.dumps({"items": _gallery_list()}).encode())
+        elif path == "/api/loras":
+            self._send(200, "application/json", json.dumps({"items": _lora_list()}).encode())
         elif path.startswith("/api/gallery/") and path.endswith(".png"):
             gid = path[len("/api/gallery/"):-4]
             if _safe_id(gid):
@@ -307,7 +524,8 @@ class Handler(BaseHTTPRequestHandler):
             _CANCEL.set()
             self._send(200, "application/json", b'{"ok":true}')
             return
-        if self.path not in ("/api/generate", "/api/upscale", "/api/download", "/api/delete", "/api/enhance", "/api/gallery/delete"):
+        if self.path not in ("/api/generate", "/api/upscale", "/api/download", "/api/delete", "/api/enhance",
+                             "/api/gallery/delete", "/api/loras/add", "/api/loras/delete"):
             self._send(404, "text/plain", b"not found")
             return
         try:
@@ -321,6 +539,21 @@ class Handler(BaseHTTPRequestHandler):
             return
         if self.path == "/api/generate":
             self._generate(req)
+        elif self.path == "/api/loras/add":
+            try:
+                with _DLLOCK:   # serialize with other downloads — deterministic .part names
+                    items = _lora_add(str(req.get("source", "")))
+                self._send(200, "application/json", json.dumps({"ok": True, "items": items}).encode())
+            except ValueError as e:
+                self._send(200, "application/json", json.dumps({"ok": False, "error": str(e)}).encode())
+        elif self.path == "/api/loras/delete":
+            name = str(req.get("name", ""))
+            if _safe_lora_name(name):
+                try:
+                    os.remove(os.path.join(_lora_dir(), name))
+                except OSError:
+                    pass
+            self._send(200, "application/json", json.dumps({"ok": True, "items": _lora_list()}).encode())
         elif self.path == "/api/upscale":
             self._upscale(req)
         elif self.path == "/api/enhance":
@@ -363,8 +596,19 @@ class Handler(BaseHTTPRequestHandler):
                     raise _Cancelled()
                 emit({"type": "step", "step": s, "total": total})
 
+            def preview(s, total, im):   # in-progress frame (Live preview); best-effort, never blocks a run
+                try:
+                    safe_emit({"type": "preview", "step": s, "total": total, "image": _jpeg_datauri(im)})
+                except Exception:
+                    pass
+
             try:
                 backend, variant = _registry().resolve(req.get("model", ""))
+                # Live preview: attach the frame emitter to the step callback (mflux backends read
+                # step.preview via _wire_progress). Opt-in from the UI (default on), and only for
+                # backends that can decode in-progress latents — others silently show progress only.
+                if req.get("preview", True) and getattr(backend, "supports_preview", False):
+                    step.preview = preview
                 # Hard RAM gate: refuse a build whose memory floor this Mac can't meet, BEFORE mflux
                 # fetches gigabytes of weights only to OOM at load. The UI shows a confirm dialog and
                 # sends allow_low_ram=true to override; power users can set ALIS_ALLOW_LOW_RAM. A failed
@@ -381,6 +625,12 @@ class Handler(BaseHTTPRequestHandler):
                 w = int(params.get("width") or params.get("size") or 1024)
                 h = int(params.get("height") or params.get("size") or 1024)
                 params["width"], params["height"] = w, h
+                # reproducibility snapshot: the UI-facing settings (LoRAs still by library name,
+                # no image payloads) — saved with each gallery item so "Restore settings" can rebuild
+                ui_params = {k: v for k, v in params.items()
+                             if k not in ("init_image", "image_path") and not isinstance(v, (bytes,))}
+                had_image = bool(params.get("init_image"))
+                _resolve_loras(params)                 # [{'name','scale'}] → validated [{'path','scale'}]
                 img_tmp = _stash_input_image(params)   # img2img: decode uploaded image → params["image_path"]
                 t0 = time.time()
 
@@ -388,6 +638,9 @@ class Handler(BaseHTTPRequestHandler):
                     if backend.will_load(variant):   # model not in memory → load (first ever use also downloads)
                         safe_emit({"type": "status",
                                    "message": f"Loading {backend.label}… (first use may download weights)"})
+                        _free_other_backends(backend)   # constrained Macs: don't stack two pipelines
+                    elif params.get("loras"):   # a changed LoRA set reloads inside generate — say so
+                        safe_emit({"type": "status", "message": "Applying LoRA(s)… (re-fuses the model)"})
                     out = backend.generate(prompt=str(req.get("prompt", "")), variant=variant,
                                            params=params, step_callback=step)
                     if _CANCEL.is_set():  # stopped after the last step, or by a backend that doesn't tick
@@ -400,7 +653,10 @@ class Handler(BaseHTTPRequestHandler):
                 ow, oh = (imgs[0].width, imgs[0].height) if imgs else (w, h)
                 meta = {"model": backend.label, "width": ow, "height": oh,
                         "steps": int(params.get("steps", 8)), "seed": int(params.get("seed", 0)),
-                        "seconds": round(time.time() - t0, 1)}
+                        "seconds": round(time.time() - t0, 1),
+                        # reproducibility: full recipe for "Restore settings" (and PNG embedding)
+                        "model_id": str(req.get("model", "")), "params": ui_params,
+                        "had_image": had_image}
                 try:
                     _gallery_save(imgs, str(req.get("prompt", "")), meta)   # best-effort history
                 except Exception:

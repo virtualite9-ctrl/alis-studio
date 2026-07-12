@@ -82,19 +82,39 @@ too large to ship inside a DMG.
   renders keep the exact decode. Override with `ALIS_VAE_TILING=1`/`0`.
 - **Bigger images** — per-model max resolution: Krea 2 Turbo up to **2048²** (a native 1K–2K model),
   Qwen-Image 1536², Z-Image / FLUX 1280². The picker warns when a size may not fit your Mac's memory.
-- **Image-to-image** — the mflux models (Z-Image / Qwen / FLUX) take an optional **Input image** +
-  **Strength**; attach a picture and transform it with your prompt. (Krea 2 Turbo is text-to-image only.)
+- **Image-to-image** — every generation model (**Krea 2 Turbo**, Z-Image, Qwen, FLUX, ERNIE) takes an
+  optional **Input image** + **Strength**; attach (or just paste) a picture and transform it with
+  your prompt.
+- **Live preview** — watch the image form. The eye toggle (next to the safety shield, on by default)
+  streams a few downscaled in-progress frames under the progress bar as it denoises — the "preview"
+  behaviour you know from CivitAI, handy for iterating on a prompt. Throttled to ~3 frames per run;
+  each frame is a quick VAE decode, so it adds a little time on the big models — turn it off for
+  maximum speed. Available on Z-Image, CyberRealistic Z, ERNIE-Image, Qwen-Image, and FLUX.
+- **LoRA** — a shared library for style/subject adapters: paste a download URL (on Civitai, the
+  **Download button's link**, not the page URL; on Hugging Face, the file's `/resolve/` URL) or a
+  local `.safetensors`, check the ones to apply, set per-LoRA strength — multiple LoRAs stack, and
+  Civitai's usual key formats are recognized automatically. Works on Z-Image, CyberRealistic Z,
+  Qwen-Image (+Edit), and FLUX — pick LoRAs made for the selected model family. (Z-Image has the
+  largest LoRA scene on Civitai.) Auth-gated Civitai files need `CIVITAI_API_TOKEN` in the
+  environment (free key from civitai.com/user/account) — easiest when running from a terminal.
+- **Restore settings & reproducibility** — every generated image keeps its full recipe (model, size,
+  steps, seed, LoRAs); one lightbox click restores everything for a re-run or a tweak (restoring
+  turns auto-seed off so the saved seed actually applies). The recipe is also embedded in the PNG
+  itself. An **auto-seed** toggle rolls a fresh seed each Generate.
 - **Instruction editing** — **Qwen-Image Edit** (Apache-2.0) follows an edit instruction ("make the
   hat red", understands Korean); the output keeps the input's aspect ratio, normalized to ~1 MP
   (≈1024²). Offered in 8-bit / bf16; it's a large model (~54 GB download, **≥ 64 GB** for 8-bit,
   **≥ 96 GB** for bf16), so the picker warns — and the app refuses with a confirm override — when your
   Mac is under a build's memory floor. 4-bit is intentionally omitted: mflux quantizes it to noise.
-- **Canvas editor** — hit **Edit** on any image (a fresh result or a gallery item) to open a
-  Gemini-style editor: **Sketch** freehand in a chosen
-  colour, drop **Text** labels where you click, then describe the change ("make the circled area
-  blue"). The marks are baked into the image handed to Qwen-Image Edit, which follows them and paints
-  the drawing back out; the result replaces the canvas so you can keep editing. (Needs the Qwen-Image
-  Edit backend, so a ≥ 64 GB Mac.)
+- **Canvas editor** — hit **Edit** on any image (a fresh result, a gallery item, or **your own
+  picture** via the top-bar Edit button, drag-drop, or paste ⌘V) to open a
+  Gemini-style editor: **sketch, circle, box, arrow, or drop a text label** (three stroke sizes,
+  eight colours, full undo/redo with ⌘Z/⇧⌘Z), then describe the change ("make the circled area
+  blue"). The marks are baked into the image handed to Qwen-Image Edit, which follows them and
+  paints the drawing back out. Results land in a **step-history strip** — click any step (including
+  the original) to go back and branch from there; **Fast/Fine** picks 4- or 8-step quality, and each
+  run uses a fresh seed so "Edit" again gives a new take. (Needs the Qwen-Image Edit backend, so a
+  ≥ 64 GB Mac.)
 - **Upscale** — open any gallery image and **Upscale 2× / 3×** with [SeedVR2](https://github.com/ml-explore)
   diffusion super-resolution (3B, Apache-2.0). Model downloads on first use; available on Macs with ≥ 24 GB.
 - **Gallery** — every generation is saved; click a thumbnail (or its prompt) for a lightbox with the
@@ -110,14 +130,19 @@ too large to ship inside a DMG.
 The **Model** section in Settings (and the whole settings panel) is built from whatever backends are
 installed — the UI discovers them at startup via `/api/models` and `/api/catalog`, so adding a model
 needs no UI changes. Each model's builds are grouped under its name; switch with **Use**, manage
-downloads inline, and the previous build is freed when you switch (two big models won't fit at once).
+downloads inline, and switching **builds of the same model** frees the previous one (two big builds
+won't fit at once). Switching **between models** on a Mac with ≤ 32 GB frees the previous model
+automatically (two pipelines won't fit); bigger Macs keep it cached for instant switch-back.
 
 | Model | Builds | Download |
 |---|---|---|
 | **Krea 2 Turbo** | 8-bit (14.2 GB) · mixed-4/8 (9.8 GB). 8-step Turbo. Wants ≥ 24 GB RAM. | managed in-app (resumable, with progress) |
 | **Z-Image Turbo** | 4-bit (~6 GB) · 8-bit · bf16. 9-step Turbo, Apache-2.0. **Runs on 16 GB**; multilingual (Qwen3 encoder). | auto on first use via mflux |
+| **CyberRealistic Z** | 4-bit (~5.5 GB, **runs on 16 GB**) · 8-bit (~10 GB, ≥ 24 GB). [Civitai](https://civitai.com/models/2218365) photorealism finetune of Z-Image Turbo by [Cyberdelia](https://civitai.com/user/Cyberdelia) (OpenRAIL-M). Separate weights from the base model. | auto on first use ([mlx build](https://huggingface.co/avlp12/CyberRealistic-Z-Image-Turbo-v4-mflux-4bit)) |
 | **Qwen-Image** | 8-bit, bf16. Apache-2.0, open. (No 4-bit — its ~20B transformer gets grainy below 8-bit.) | auto on first use via mflux (~40 GB) |
+| **ERNIE-Image Turbo** | 8-bit (≥ 48 GB) · bf16 (≥ 64 GB). Baidu's 8B, Apache-2.0. **Best here for text rendering / posters / structured layouts**; ~8-step Turbo. (No 4-bit — loads full precision before quantizing, so 4-bit wouldn't lower the load floor.) | auto on first use via mflux (~32 GB) |
 | **Qwen-Image Edit** | 8-bit (needs ≥ 64 GB) · bf16 (≥ 96 GB). Apache-2.0 instruction editing. (No 4-bit — mflux quantizes it to noise.) | auto on first use via mflux (~54 GB) |
+| **FLUX.2 klein 4B** | 4-bit (**runs on 16 GB**) · 8-bit · bf16. BFL's 2026 fast model, ~4 steps, Apache-2.0, **ungated**. img2img + LoRA. | auto on first use via mflux (~15 GB) |
 | **FLUX.1 schnell** | 8/4-bit, bf16. Apache-2.0 weights, **gated repo**. | auto on first use via mflux (~24 GB) |
 | **FLUX.1 dev** | 8/4-bit, bf16. Non-commercial, **gated**. | auto on first use via mflux (~24 GB) |
 
@@ -209,7 +234,9 @@ Everything runs **locally** — prompts and images never leave your Mac.
 This application is **MIT** licensed ([`LICENSE`](LICENSE)). **Each model carries its own license:**
 the Krea 2 Turbo backend uses weights under the
 [Krea 2 Community License](https://krea.ai/krea-2-licensing) (commercial use requires annual revenue
-under $1M; content filtering required for deployments — the built-in filter is on by default). You're
+under $1M; content filtering required for deployments — the built-in filter is on by default), and
+**CyberRealistic Z** is **CreativeML OpenRAIL-M** — use-based restrictions apply; see the
+[model card](https://huggingface.co/avlp12/CyberRealistic-Z-Image-Turbo-v4-mflux-4bit). You're
 responsible for complying with the license of any model you load.
 
 *Part of the **Alis** MLX line — see also [krea2_alis_mlx](https://github.com/avlp12/krea2_alis_mlx).*

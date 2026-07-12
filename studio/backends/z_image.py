@@ -15,32 +15,40 @@ builds quantize on the fly from the official ``Tongyi-MAI/Z-Image-Turbo`` repo (
 
 from __future__ import annotations
 
+import os
+
 from .base import Backend
-from .mflux_common import _apply_memory_policy, _img2img_args, _img2img_params, _wire_progress
-
-# variant id -> (mflux model_path, quantize).
-# 4-bit: a ready pre-quantized repo (no on-the-fly quantization, light download, 16 GB-friendly).
-# 8-bit/bf16: the official full-precision repo, quantized at load (8) or kept as-is (None=bf16).
-_BUILDS = {
-    "4bit": ("filipstrand/Z-Image-Turbo-mflux-4bit", None),
-    "8bit": (None, 8),
-    "bf16": (None, None),
-}
-
+from .mflux_common import (_apply_memory_policy, _construct_checking_lora, _img2img_args,
+                           _img2img_params, _lora_args, _lora_params, _lora_sig, _wire_progress)
 
 class ZImageTurboBackend(Backend):
-    """Z-Image-Turbo (open, Apache-2.0) via mflux — downloads on first use, no HF gating."""
+    """Z-Image-Turbo (open, Apache-2.0) via mflux — downloads on first use, no HF gating.
 
+    Subclassable: a Z-Image finetune backend (e.g. cyber_z.py) overrides id/label/info/variants and
+    BUILDS — everything else (params, loading, img2img, memory policy) is shared."""
+
+    # variant id -> (mflux model_path, quantize).
+    # 4-bit: a ready pre-quantized repo (no on-the-fly quantization, light download, 16 GB-friendly).
+    # 8-bit/bf16: the official full-precision repo, quantized at load (8) or kept as-is (None=bf16).
+    # Subclasses override this dict; every variants[] id MUST be a BUILDS key (unknown ids raise).
+    BUILDS = {
+        "4bit": ("filipstrand/Z-Image-Turbo-mflux-4bit", None),
+        "8bit": (None, 8),
+        "bf16": (None, None),
+    }
     id = "z-image-turbo"
     label = "Z-Image Turbo"
+    supports_preview = True   # ZImage exposes _decode_latents(latents, config) → live preview works (inherited by cyber-z)
     min_ram_gib = 16   # 4-bit pipeline ~6 GB resident; 1024² peaks ~8.5 GB with VAE tiling → runs on 16 GB
-    prompt_note = "Understands Korean and other languages natively (Qwen3 text encoder). Distilled — fast at ~9 steps."
+    prompt_note = "The general-purpose base model (Apache-2.0 — the safest license here). Understands Korean natively (Qwen3 encoder); distilled — fast at ~9 steps."
     info = "Apache-2.0 (open) · 4-bit runs on a 16 GB Mac (best at 512–768px) · downloads on first use via mflux"
     # 4-bit is listed first on purpose: it is the default (variants[0]) and the only 16 GB-friendly build.
     variants = [
         {"id": "4bit", "label": "4-bit · ~6 GB · 16 GB-Mac friendly"},
-        {"id": "8bit", "label": "8-bit · ~33 GB download"},
-        {"id": "bf16", "label": "bf16 · full precision, ~33 GB"},
+        # 8-bit/bf16 quantize on the fly from the ~33 GB bf16 repo — the transient full-precision
+        # weights want a roomy Mac, hence the explicit floors
+        {"id": "8bit", "label": "8-bit · ~33 GB download · wants ≥ 24 GB RAM", "min_ram": 24},
+        {"id": "bf16", "label": "bf16 · full precision, ~33 GB · wants ≥ 32 GB RAM", "min_ram": 32},
     ]
     params = [
         {"key": "resolution", "label": "Resolution", "type": "resolution", "group": "Output",
@@ -58,6 +66,7 @@ class ZImageTurboBackend(Backend):
          "default": "", "enabled": False,
          "hint": "Turbo runs without guidance, so a negative prompt has no effect."},
         *_img2img_params(),
+        *_lora_params(),
     ]
 
     @classmethod
@@ -71,37 +80,55 @@ class ZImageTurboBackend(Backend):
     def __init__(self):
         self._model = None
         self._variant = None
+        self._loras = ()   # LoRA signature of the cached model — mflux fuses LoRA at construction
 
-    def _get(self, variant):
+    def _get(self, variant, params=None):
         import gc
         import mlx.core as mx
         from mflux.models.common.config import ModelConfig
         from mflux.models.z_image.variants.z_image import ZImage
-        if self._model is None or self._variant != variant:
+        loras = _lora_sig(params or {})
+        if self._model is None or self._variant != variant or self._loras != loras:
             self._model, self._variant = None, None
             gc.collect()
             mx.clear_cache()
-            model_path, quantize = _BUILDS.get(variant, _BUILDS["4bit"])
+            builds = self.BUILDS
+            if variant not in builds:   # never substitute silently — the user would get (and cache) the wrong build
+                raise ValueError(f"Unknown build '{variant}' for {self.label} — expected one of: {', '.join(builds)}.")
+            model_path, quantize = builds[variant]
+            lora_paths, lora_scales = _lora_args(params or {})
             try:
-                self._model = ZImage(model_config=ModelConfig.z_image_turbo(),
-                                     quantize=quantize, model_path=model_path)
-            except Exception as e:  # the 4-bit build is a community pre-quant repo — guide, don't traceback
+                self._model = _construct_checking_lora(
+                    lambda: ZImage(model_config=ModelConfig.z_image_turbo(),
+                                   quantize=quantize, model_path=model_path,
+                                   lora_paths=lora_paths, lora_scales=lora_scales),
+                    lora_paths)
+            except Exception as e:  # pre-quant builds live in community repos — guide, don't traceback
                 m = str(e).lower()
                 if model_path and any(k in m for k in ("not found", "404", "401", "403",
                                                        "repository", "gated", "restricted")):
                     raise ValueError(
-                        "The 4-bit Z-Image build (filipstrand/Z-Image-Turbo-mflux-4bit) couldn't be "
-                        "downloaded — it may have moved or you may be offline. Try the 8-bit or bf16 build."
+                        f"The {variant} build ({model_path}) couldn't be downloaded — it may have "
+                        "moved or you may be offline. Try another build of this model."
                     ) from None
                 raise
             self._variant = variant
+            self._loras = loras
+            if model_path and "/" in model_path and not os.path.exists(model_path):
+                try:  # mflux never fetches the repo's root config.json, but that's the file the Hub
+                    from huggingface_hub import hf_hub_download  # counts — touch it so downloads register
+                    hf_hub_download(model_path, "config.json")
+                except Exception:
+                    pass
         return self._model
 
     def will_load(self, variant):
+        # a LoRA-set change also reloads, but that happens inside generate (params aren't available
+        # here); it's a seconds-long fuse, not a download — no loading banner needed
         return self._model is None or self._variant != variant
 
     def generate(self, *, prompt, variant, params, step_callback):
-        model = self._get(variant)
+        model = self._get(variant, params)
         w, h = int(params.get("width", 1024)), int(params.get("height", 1024))
         _apply_memory_policy(model, w, h)
         img_path, strength = _img2img_args(params)
